@@ -1,28 +1,18 @@
 # TSignal
 
-A Python Signal-Slot library inspired by Qt
+Are you looking for a signal/slot pattern in Python without Qt dependencies? TSignal provides a lightweight, thread-safe, and asyncio-compatible implementation that gives you all the power of Qt's signal/slot pattern without the heavyweight dependencies. Perfect for:
 
-## Features
-- Easy-to-use signal-slot mechanism with decorators
-- Support for both synchronous and asynchronous slots
-- Thread-safe signal emissions
-- Automatic connection type detection (direct/queued)
-- Compatible with Python's asyncio
+- Async applications needing event handling
+- Thread communication in Python applications
+- Event-driven architectures
+- Decoupled component communication
 
-## Installation
-
-Currently, this package is under development. You can install it directly from the repository:
-
-```bash
-git clone https://github.com/tsignal/tsignal-python.git
-cd tsignal-python
-pip install -e .
-```
-
-For development installation (includes test dependencies):
-```bash
-pip install -e ".[dev]"
-```
+## Why TSignal?
+- 🚀 Pure Python implementation - no Qt or external dependencies required
+- ⚡ Async/await support out of the box
+- 🔒 Thread-safe signal emission and slot execution
+- 🎯 Simple, decorator-based API similar to Qt
+- 🔄 Automatic thread handling for cross-thread signals
 
 ## Quick Start
 
@@ -37,7 +27,6 @@ class Counter:
     
     @t_signal
     def count_changed(self):
-        """Signal emitted when count changes"""
         pass
     
     def increment(self):
@@ -47,18 +36,14 @@ class Counter:
 @t_with_signals
 class Display:
     @t_slot
-    def on_count_changed(self, value):
+    async def on_count_changed(self, value):
         print(f"Count is now: {value}")
 
-# Usage
+# Connect and use
 counter = Counter()
 display = Display()
-
-# Connect signal to slot
 counter.count_changed.connect(display, display.on_count_changed)
-
-# Increment will trigger signal emission
-counter.increment()  # Output: Count is now: 1
+counter.increment()  # Will print: "Count is now: 1"
 ```
 
 ### Async Example
@@ -82,6 +67,28 @@ async def main():
     await asyncio.sleep(1.1)
 
 asyncio.run(main())
+```
+
+## Features
+- Easy-to-use signal-slot mechanism with decorators
+- Support for both synchronous and asynchronous slots
+- Thread-safe signal emissions
+- Automatic connection type detection (direct/queued)
+- Compatible with Python's asyncio
+
+## Installation
+
+Currently, this package is under development. You can install it directly from the repository:
+
+```bash
+git clone https://github.com/tsignal/tsignal-python.git
+cd tsignal-python
+pip install -e .
+```
+
+For development installation (includes test dependencies):
+```bash
+pip install -e ".[dev]"
 ```
 
 ## Documentation
