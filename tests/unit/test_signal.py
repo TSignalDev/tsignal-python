@@ -216,3 +216,47 @@ def test_direct_function_disconnect(sender):
     # Second emit - should not add value since connection is disconnected
     sender.emit_value(43)
     assert received_values == [42]
+
+
+def test_method_connection_with_signal_attributes(sender):
+    """Test connecting a method with _thread and _loop attributes automatically sets up receiver"""
+    received_values = []
+
+    @t_with_signals
+    class SignalReceiver:
+        def collect_value(self, value):
+            received_values.append(value)
+
+    class RegularClass:
+        def collect_value(self, value):
+            received_values.append(value * 2)
+
+    # t_with_signals가 적용된 객체의 메소드
+    signal_receiver = SignalReceiver()
+    sender.value_changed.connect(signal_receiver.collect_value)
+
+    # 일반 객체의 메소드
+    regular_receiver = RegularClass()
+    sender.value_changed.connect(regular_receiver.collect_value)
+
+    # Emit signal
+    sender.emit_value(42)
+
+    # signal_receiver는 QueuedConnection으로 처리되어야 함
+    connection = next(
+        conn
+        for conn in sender.value_changed.connections
+        if conn[1] == signal_receiver.collect_value
+    )
+    assert connection[0] == signal_receiver  # receiver가 자동으로 설정됨
+
+    # regular_receiver는 DirectConnection으로 처리되어야 함
+    connection = next(
+        conn
+        for conn in sender.value_changed.connections
+        if hasattr(conn[1], "__wrapped__")
+    )
+    assert connection[0] is None  # receiver가 None임
+
+    assert 42 in received_values  # SignalReceiver의 결과
+    assert 84 in received_values  # RegularClass의 결과 (42 * 2)

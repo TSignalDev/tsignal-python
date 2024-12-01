@@ -59,8 +59,20 @@ class TSignal:
                     f"Invalid connection attempt - receiver_or_slot is not callable: {receiver_or_slot}"
                 )
                 raise TypeError("When slot is not provided, receiver must be callable")
-            slot = _wrap_direct_function(receiver_or_slot)
+
             receiver = None
+
+            if hasattr(receiver_or_slot, "__self__"):
+                obj = receiver_or_slot.__self__
+                if hasattr(obj, _SignalConstants.THREAD) and hasattr(
+                    obj, _SignalConstants.LOOP
+                ):
+                    receiver = obj
+                    slot = receiver_or_slot
+                else:
+                    slot = _wrap_direct_function(receiver_or_slot)
+            else:
+                slot = _wrap_direct_function(receiver_or_slot)
         else:
             if receiver_or_slot is None:
                 logger.error("Invalid connection attempt - receiver cannot be None")

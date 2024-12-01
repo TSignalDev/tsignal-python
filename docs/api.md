@@ -92,6 +92,33 @@ Connects the signal to a slot.
   - `receiver_or_slot`: The callable (function, lambda, or method)
   - `slot`: None
 
+**Connection Behavior:**
+1. Object Method with Signal Support:
+   ```python
+   @t_with_signals
+   class Receiver:
+       def on_signal(self, value):
+           print(value)
+   
+   receiver = Receiver()
+   signal.connect(receiver.on_signal)  # Automatically sets up receiver
+   ```
+
+2. Regular Object Method:
+   ```python
+   class RegularClass:
+       def on_signal(self, value):
+           print(value)
+   
+   obj = RegularClass()
+   signal.connect(obj.on_signal)  # Treated as direct connection
+   ```
+
+The connection type is automatically determined:
+- Methods from objects with `@t_with_signals` are set up with their object as receiver
+- Regular object methods are treated as direct connections
+- Async methods always use queued connections
+
 ##### `disconnect(receiver: Optional[object] = None, slot: Optional[Callable] = None) -> int`
 Disconnects one or more slots from the signal.
 
