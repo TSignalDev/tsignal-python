@@ -79,8 +79,10 @@ def setup_logging():
     default_level = logging.WARNING
 
     # Can enable DEBUG mode via environment variable
-    if os.environ.get("TSIGNAL_DEBUG"):
-        default_level = logging.DEBUG
+
+    default_level = logging.DEBUG
+    # if os.environ.get("TSIGNAL_DEBUG"):
+    #    default_level = logging.DEBUG
 
     root.setLevel(default_level)
 

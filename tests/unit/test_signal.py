@@ -154,3 +154,65 @@ async def test_signal_disconnect_during_emit(sender, receiver, event_loop):
 
     assert slow_receiver.received_value == 42
     assert receiver.received_value is None
+
+
+def test_direct_function_connection(sender):
+    """Test direct connection of lambda and regular functions"""
+    received_values = []
+
+    def collect_value(value):
+        received_values.append(value)
+
+    # Connect lambda function
+    sender.value_changed.connect(lambda v: received_values.append(v * 2))
+
+    # Connect regular function
+    sender.value_changed.connect(collect_value)
+
+    # Emit signal
+    sender.emit_value(42)
+
+    assert 42 in received_values  # Added by collect_value
+    assert 84 in received_values  # Added by lambda function (42 * 2)
+    assert len(received_values) == 2
+
+
+@pytest.mark.asyncio
+async def test_direct_async_function_connection(sender):
+    """Test direct connection of async functions"""
+    received_values = []
+
+    async def async_collector(value):
+        await asyncio.sleep(0.1)
+        received_values.append(value)
+
+    # Connect async function
+    sender.value_changed.connect(async_collector)
+
+    # Emit signal
+    sender.emit_value(42)
+
+    # Wait for async processing
+    await asyncio.sleep(0.2)
+
+    assert received_values == [42]
+
+
+def test_direct_function_disconnect(sender):
+    """Test disconnection of directly connected functions"""
+    received_values = []
+
+    collector = lambda v: received_values.append(v)
+    sender.value_changed.connect(collector)
+
+    # First emit
+    sender.emit_value(42)
+    assert received_values == [42]
+
+    # Disconnect
+    disconnected = sender.value_changed.disconnect(slot=collector)
+    assert disconnected == 1
+
+    # Second emit - should not add value since connection is disconnected
+    sender.emit_value(43)
+    assert received_values == [42]
