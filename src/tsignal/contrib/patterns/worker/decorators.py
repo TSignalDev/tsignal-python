@@ -2,6 +2,7 @@ import asyncio
 import threading
 import logging
 import time
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +17,15 @@ def t_with_worker(cls):
         def __init__(self):
             self._worker_loop = None
             self._worker_thread = None
-            self._stopping = asyncio.Event()
             self._task_queue = asyncio.Queue()
             # Setting up thread/loop for compatibility with t_with_signals
             self._thread = threading.current_thread()
             try:
                 self._loop = asyncio.get_event_loop()
+                if sys.version_info < (3, 9):
+                    self._stopping = asyncio.Event(loop=self._loop)
+                else:
+                    self._stopping = asyncio.Event()
             except RuntimeError:
                 self._loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(self._loop)
