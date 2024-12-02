@@ -14,3 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic connection type detection
 - Comprehensive test suite
 - Full documentation
+
+## [0.1.1] - 2024-12-01
+
+### Changed
+- Refactored signal connection logic to support direct function connections.
+- Improved error handling for invalid connections.
+- Enhanced logging for signal emissions and connections.
+
+### Fixed
+- Resolved issues with disconnecting slots during signal emissions.
+- Fixed bugs related to async slot processing and connection management.
+
+### Removed
+- Deprecated unused constants and methods from the core module.
