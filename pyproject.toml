@@ -34,7 +34,8 @@ Issues = "https://github.com/tsignal/tsignal-python/issues"
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "pytest-asyncio>=0.21.0"
+    "pytest-asyncio>=0.21.0",
+    "memory_profiler"
 ]
 
 [tool.setuptools]
