@@ -1,0 +1,137 @@
+"""
+Thread Worker Pattern Example
+
+This example demonstrates the worker thread pattern using TSignal's t_with_worker decorator:
+
+1. Worker Thread:
+   - ImageProcessor: A worker class that processes images in background
+   - Supports async initialization and cleanup
+   - Uses task queue for processing requests
+   - Communicates results via signals
+
+2. Main Thread:
+   - Controls worker lifecycle
+   - Submits processing requests
+   - Receives processing results
+
+Architecture:
+- Worker runs in separate thread with its own event loop
+- Task queue ensures sequential processing
+- Signal/Slot connections handle thread-safe communication
+"""
+
+import asyncio
+import time
+from tsignal import t_with_signals, t_signal, t_slot, t_with_worker
+
+
+@t_with_worker
+class ImageProcessor:
+    """Worker that processes images in background thread"""
+
+    def __init__(self):
+        self.cache = {}
+        super().__init__()
+
+    async def initialize(self, cache_size=100):
+        """Initialize worker (runs in worker thread)"""
+        print(f"[Worker Thread] Initializing image processor (cache_size={cache_size})")
+        self.cache_size = cache_size
+
+    async def finalize(self):
+        """Cleanup worker (runs in worker thread)"""
+        print("[Worker Thread] Cleaning up image processor")
+        self.cache.clear()
+
+    @t_signal
+    def processing_complete(self):
+        """Signal emitted when image processing completes"""
+        pass
+
+    @t_signal
+    def batch_complete(self):
+        """Signal emitted when batch processing completes"""
+        pass
+
+    async def process_image(self, image_id: str, image_data: bytes):
+        """Process single image (runs in worker thread)"""
+        print(f"[Worker Thread] Processing image {image_id}")
+
+        # Simulate image processing
+        await asyncio.sleep(0.5)
+        result = f"Processed_{image_id}"
+
+        # Cache result
+        if len(self.cache) >= self.cache_size:
+            self.cache.pop(next(iter(self.cache)))
+        self.cache[image_id] = result
+
+        # Emit result
+        self.processing_complete.emit(image_id, result)
+        return result
+
+    async def process_batch(self, images: list):
+        """Process batch of images (runs in worker thread)"""
+        results = []
+        for img_id, img_data in images:
+            result = await self.process_image(img_id, img_data)
+            results.append(result)
+        self.batch_complete.emit(results)
+        return results
+
+
+@t_with_signals
+class ImageViewer:
+    """UI component that displays processed images"""
+
+    def __init__(self):
+        print("[Main Thread] Creating image viewer")
+        self.processed_images = {}
+
+    @t_slot
+    def on_image_processed(self, image_id: str, result: str):
+        """Handle processed image (runs in main thread)"""
+        print(f"[Main Thread] Received processed image {image_id}")
+        self.processed_images[image_id] = result
+
+    @t_slot
+    def on_batch_complete(self, results: list):
+        """Handle completed batch (runs in main thread)"""
+        print(f"[Main Thread] Batch processing complete: {len(results)} images")
+
+
+async def main():
+    # Create components
+    processor = ImageProcessor()
+    viewer = ImageViewer()
+
+    # Connect signals
+    processor.processing_complete.connect(viewer, viewer.on_image_processed)
+    processor.batch_complete.connect(viewer, viewer.on_batch_complete)
+
+    # Start worker
+    print("\n=== Starting worker ===\n")
+    processor.start(cache_size=5)
+
+    # Simulate image processing requests
+    print("\n=== Processing single images ===\n")
+    for i in range(3):
+        image_id = f"img_{i}"
+        image_data = b"fake_image_data"
+        await processor.queue_task(processor.process_image(image_id, image_data))
+
+    # Simulate batch processing
+    print("\n=== Processing batch ===\n")
+    batch = [(f"batch_img_{i}", b"fake_batch_data") for i in range(3)]
+    await processor.queue_task(processor.process_batch(batch))
+
+    # Wait for processing to complete
+    await asyncio.sleep(3)
+
+    # Stop worker
+    print("\n=== Stopping worker ===\n")
+    processor.stop()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
