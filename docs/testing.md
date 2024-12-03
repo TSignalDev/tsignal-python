@@ -84,3 +84,12 @@ pytest --cov=tsignal
 # Generate HTML coverage report
 pytest --cov=tsignal --cov-report=html
 ```
+
+## Async Testing Configuration
+
+The project uses `pytest-asyncio` with `asyncio_mode = "auto"` to handle async fixtures and tests. This configuration allows for more flexible handling of async/sync code interactions, especially in worker-related tests where we need to manage both synchronous and asynchronous operations.
+
+Key points:
+- Async fixtures can yield values directly
+- Both sync and async tests can use the same fixtures
+- Worker thread initialization and cleanup are handled automatically
