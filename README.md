@@ -70,6 +70,7 @@ asyncio.run(main())
 ```
 
 ## Features
+- Requires Python 3.10+
 - Easy-to-use signal-slot mechanism with decorators
 - Support for both synchronous and asynchronous slots
 - Thread-safe signal emissions
@@ -78,7 +79,7 @@ asyncio.run(main())
 
 ## Installation
 
-Currently, this package is under development. You can install it directly from the repository:
+TSignal requires Python 3.10 or higher. You can install it directly from the repository:
 
 ```bash
 git clone https://github.com/tsignal/tsignal-python.git

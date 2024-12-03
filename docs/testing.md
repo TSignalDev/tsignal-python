@@ -1,7 +1,7 @@
 # Testing Guide
 
 ## Overview
-TSignal uses pytest for testing. Our test suite includes unit tests, integration tests, and supports async testing.
+TSignal requires Python 3.10 or higher and uses pytest for testing. Our test suite includes unit tests, integration tests, performance tests, and supports async testing.
 
 ## Test Structure
 ```
@@ -13,10 +13,14 @@ tests/
 │   ├── test_signal.py
 │   ├── test_slot.py
 │   └── test_with_signals.py
-└── integration/        # Integration tests
+├── integration/        # Integration tests
+│   ├── __init__.py
+│   ├── test_async.py
+│   └── test_threading.py
+└── performance/        # Performance and stress tests
     ├── __init__.py
-    ├── test_async.py
-    └── test_threading.py
+    ├── test_stress.py
+    └── test_memory.py
 ```
 
 ## Running Tests
@@ -43,7 +47,22 @@ pytest tests/unit/test_signal.py -k "test_signal_disconnect_all"
 
 # Run tests by marker
 pytest -v -m asyncio
+pytest -v -m performance  # Run performance tests only
 ```
+
+### Performance Tests
+Performance tests include stress testing and memory usage analysis. These tests are marked with the `@pytest.mark.performance` decorator.
+
+```bash
+# Run only performance tests
+pytest -v -m performance
+
+# Run specific performance test
+pytest tests/performance/test_stress.py
+pytest tests/performance/test_memory.py
+```
+
+Note: Performance tests might take longer to run and consume more resources than regular tests.
 
 ### Debug Mode
 To enable debug logging during tests:

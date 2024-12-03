@@ -1,5 +1,8 @@
 # Usage Guide
 
+## Requirements
+TSignal requires Python 3.10 or higher.
+
 ## Table of Contents
 1. [Basic Concepts](#basic-concepts)
 2. [Signals](#signals)
