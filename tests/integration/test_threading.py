@@ -1,5 +1,9 @@
-import threading
+"""
+Test cases for threading.
+"""
+
 import asyncio
+import threading
 from time import sleep
 
 
@@ -9,6 +13,7 @@ def test_different_thread_connection(sender, receiver, event_loop):
     sender_done = threading.Event()
 
     def run_sender():
+        """Run the sender thread"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         for i in range(3):
@@ -18,6 +23,7 @@ def test_different_thread_connection(sender, receiver, event_loop):
         loop.close()
 
     async def wait_for_receiver():
+        """Wait for the receiver to receive the signals"""
         while not sender_done.is_set() or receiver.received_count < 3:
             await asyncio.sleep(0.1)
 
@@ -35,6 +41,7 @@ def test_call_slot_from_other_thread(receiver, event_loop):
     done = threading.Event()
 
     def other_thread():
+        """Run the other thread"""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 

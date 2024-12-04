@@ -75,18 +75,18 @@ class DataProcessor:
 ## Connection Types
 TSignal supports two types of connections:
 
-### DirectConnection
+### DIRECT_CONNECTION
 - Signal and slot execute in the same thread
 - Slot is called immediately when signal is emitted
 ```python
-signal.connect(receiver, slot, connection_type=TConnectionType.DirectConnection)
+signal.connect(receiver, slot, connection_type=TConnectionType.DIRECT_CONNECTION)
 ```
 
-### QueuedConnection
+### QUEUED_CONNECTION
 - Signal and slot can execute in different threads
 - Slot execution is queued in receiver's event loop
 ```python
-signal.connect(receiver, slot, connection_type=TConnectionType.QueuedConnection)
+signal.connect(receiver, slot, connection_type=TConnectionType.QUEUED_CONNECTION)
 ```
 
 Connection type is automatically determined based on:

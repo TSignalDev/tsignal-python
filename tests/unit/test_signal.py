@@ -1,7 +1,10 @@
-import pytest
+"""
+Test cases for the signal pattern.
+"""
+
 import asyncio
-from tsignal.core import TSignal
-from tsignal.core import t_with_signals, t_signal, t_slot
+import pytest
+from tsignal.core import t_with_signals , t_slot, TSignal
 from ..conftest import Receiver
 
 
@@ -128,17 +131,18 @@ def test_signal_disconnect_nonexistent(sender, receiver):
 
 
 @pytest.mark.asyncio
-async def test_signal_disconnect_during_emit(sender, receiver, event_loop):
+async def test_signal_disconnect_during_emit(sender, receiver):
     """Test disconnecting slots while emission is in progress"""
 
     @t_with_signals
     class SlowReceiver:
+        """Receiver class for slow slot"""
         def __init__(self):
-            super().__init__()
             self.received_value = None
 
         @t_slot
         async def on_value_changed(self, value):
+            """Slot for value changed"""
             await asyncio.sleep(0.1)
             self.received_value = value
 
@@ -161,6 +165,7 @@ def test_direct_function_connection(sender):
     received_values = []
 
     def collect_value(value):
+        """Slot for value changed"""
         received_values.append(value)
 
     # Connect lambda function
@@ -183,6 +188,7 @@ async def test_direct_async_function_connection(sender):
     received_values = []
 
     async def async_collector(value):
+        """Slot for value changed"""
         await asyncio.sleep(0.1)
         received_values.append(value)
 
@@ -202,7 +208,10 @@ def test_direct_function_disconnect(sender):
     """Test disconnection of directly connected functions"""
     received_values = []
 
-    collector = lambda v: received_values.append(v)
+    def collector(v):
+        """Slot for value changed"""
+        received_values.append(v)
+
     sender.value_changed.connect(collector)
 
     # First emit
@@ -224,39 +233,43 @@ def test_method_connection_with_signal_attributes(sender):
 
     @t_with_signals
     class SignalReceiver:
+        """Receiver class for signal attributes"""
         def collect_value(self, value):
+            """Slot for value changed"""
             received_values.append(value)
 
     class RegularClass:
+        """Regular class for value changed"""
         def collect_value(self, value):
+            """Slot for value changed"""
             received_values.append(value * 2)
 
-    # t_with_signals가 적용된 객체의 메소드
+    # signal_receiver's method
     signal_receiver = SignalReceiver()
     sender.value_changed.connect(signal_receiver.collect_value)
 
-    # 일반 객체의 메소드
+    # regular class's method
     regular_receiver = RegularClass()
     sender.value_changed.connect(regular_receiver.collect_value)
 
     # Emit signal
     sender.emit_value(42)
 
-    # signal_receiver는 QueuedConnection으로 처리되어야 함
+    # signal_receiver's method is QUEUED_CONNECTION
     connection = next(
         conn
         for conn in sender.value_changed.connections
-        if conn[1] == signal_receiver.collect_value
+        if conn[1].__name__ == signal_receiver.collect_value.__name__
     )
-    assert connection[0] == signal_receiver  # receiver가 자동으로 설정됨
+    assert connection[0] == signal_receiver  # receiver is set automatically
 
-    # regular_receiver는 DirectConnection으로 처리되어야 함
+    # regular_receiver's method is DIRECT_CONNECTION
     connection = next(
         conn
         for conn in sender.value_changed.connections
         if hasattr(conn[1], "__wrapped__")
     )
-    assert connection[0] is None  # receiver가 None임
+    assert connection[0] is None
 
-    assert 42 in received_values  # SignalReceiver의 결과
-    assert 84 in received_values  # RegularClass의 결과 (42 * 2)
+    assert 42 in received_values
+    assert 84 in received_values

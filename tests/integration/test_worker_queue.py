@@ -1,6 +1,14 @@
-import pytest
+"""
+Test cases for the worker-queue pattern.
+"""
+
+# pylint: disable=no-member
+# pylint: disable=redefined-outer-name
+
 import asyncio
 import logging
+import pytest
+from tsignal import t_signal
 from tsignal.contrib.patterns.worker.decorators import t_with_worker
 
 logger = logging.getLogger(__name__)
@@ -8,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture
 async def queue_worker():
+    """Create a queue worker"""
     logger.info("Creating QueueWorker")
     w = QueueWorker()
     yield w
@@ -19,18 +28,23 @@ async def queue_worker():
 
 @t_with_worker
 class QueueWorker:
+    """Queue worker class"""
+
     def __init__(self):
         self.processed_items = []
         super().__init__()
 
     async def initialize(self):
+        """Initialize the worker"""
         logger.info("QueueWorker initializing")
 
     async def finalize(self):
+        """Finalize the worker"""
         logger.info("QueueWorker finalizing")
 
     async def process_item(self, item):
-        logger.info(f"Processing item: {item}")
+        """Process an item"""
+        logger.info("Processing item: %s", item)
         await asyncio.sleep(0.1)  # Simulate work
         self.processed_items.append(item)
 
@@ -112,11 +126,10 @@ async def test_queue_cleanup_on_stop(queue_worker):
 @pytest.mark.asyncio
 async def test_mixed_signal_and_queue(queue_worker):
     """Test for simultaneous use of signals and task queue"""
-    from tsignal import t_signal
 
     # Add a signal
     @t_signal
-    def task_completed(self):
+    def task_completed():
         pass
 
     queue_worker.task_completed = task_completed.__get__(queue_worker)

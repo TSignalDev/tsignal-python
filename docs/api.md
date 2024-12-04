@@ -172,8 +172,8 @@ Emits the signal with the given arguments.
 Enum defining connection types.
 
 #### Values:
-- `DirectConnection`: Slot is called directly in the emitting thread
-- `QueuedConnection`: Slot is queued in the receiver's event loop
+- `DIRECT_CONNECTION`: Slot is called directly in the emitting thread
+- `QUEUED_CONNECTION`: Slot is queued in the receiver's event loop
 
 ## Usage Examples
 
@@ -222,14 +222,14 @@ asyncio.run(main())
 sender.value_changed.connect(
     receiver,
     receiver.on_value_changed,
-    connection_type=TConnectionType.DirectConnection
+    connection_type=TConnectionType.DIRECT_CONNECTION
 )
 
 # Force queued connection
 sender.value_changed.connect(
     receiver,
     receiver.on_value_changed,
-    connection_type=TConnectionType.QueuedConnection
+    connection_type=TConnectionType.QUEUED_CONNECTION
 )
 ```
 

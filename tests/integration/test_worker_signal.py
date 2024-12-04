@@ -1,7 +1,15 @@
-# tests/integration/test_worker_signals.py
-import pytest
+"""
+Test cases for the worker-signal pattern.
+"""
+
+# pylint: disable=redefined-outer-name
+# pylint: disable=unnecessary-lambda
+# pylint: disable=unnecessary-lambda-assignment
+# pylint: disable=no-member
+
 import asyncio
 import logging
+import pytest
 from tsignal.contrib.patterns.worker.decorators import t_with_worker
 from tsignal import t_signal
 
@@ -10,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture
 async def signal_worker():
+    """Create a signal worker"""
     logger.info("Creating SignalWorker")
     w = SignalWorker()
     yield w
@@ -21,28 +30,33 @@ async def signal_worker():
 
 @t_with_worker
 class SignalWorker:
+    """Signal worker class"""
+
     def __init__(self):
         self.value = None
         super().__init__()
 
     @t_signal
     def value_changed(self):
-        pass
+        """Signal emitted when the value changes"""
 
     @t_signal
     def worker_event(self):
-        pass
+        """Signal emitted when a worker event occurs"""
 
     async def initialize(self):
+        """Initialize the worker"""
         logger.info("SignalWorker initializing")
         self.value_changed.emit("initialized")
 
     async def finalize(self):
+        """Finalize the worker"""
         logger.info("SignalWorker finalizing")
         self.value_changed.emit("finalized")
 
     def set_value(self, value):
-        logger.info(f"Setting value to: {value}")
+        """Set the value and emit the signal"""
+        logger.info("Setting value to: %s", value)
         self.value = value
         self.value_changed.emit(value)
 

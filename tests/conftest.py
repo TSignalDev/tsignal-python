@@ -1,10 +1,20 @@
-import pytest
+"""
+Shared fixtures for tests.
+"""
+
+# pylint: disable=no-member
+# pylint: disable=redefined-outer-name
+# pylint: disable=unused-variable
+# pylint: disable=unused-argument
+# pylint: disable=property-with-parameters
+
+import os
+import sys
 import asyncio
 import threading
-from tsignal import t_with_signals, t_signal, t_slot
 import logging
-import sys
-import os
+import pytest
+from tsignal import t_with_signals, t_signal, t_slot
 
 # Only creating the logger without configuration
 logger = logging.getLogger(__name__)
@@ -12,60 +22,67 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="function")
 def event_loop():
+    """Create an event loop"""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     yield loop
     loop.close()
 
-
 @t_with_signals
 class Sender:
+    """Sender class"""
     @t_signal
     def value_changed(self, value):
         """Signal for value changes"""
-        pass
 
     def emit_value(self, value):
+        """Emit a value change signal"""
         self.value_changed.emit(value)
-
 
 @t_with_signals
 class Receiver:
+    """Receiver class"""
     def __init__(self):
         super().__init__()
         self.received_value = None
         self.received_count = 0
         self.id = id(self)
-        logger.info(f"Created Receiver[{self.id}]")
+        logger.info("Created Receiver[%d]", self.id)
 
     @t_slot
     async def on_value_changed(self, value: int):
-        logger.info(f"Receiver[{self.id}] on_value_changed called with value: {value}")
-        logger.info(f"Current thread: {threading.current_thread().name}")
-        logger.info(f"Current event loop: {asyncio.get_running_loop()}")
+        """Slot for value changes"""
+        logger.info("Receiver[%d] on_value_changed called with value: %d", self.id, value)
+        logger.info("Current thread: %s", threading.current_thread().name)
+        logger.info("Current event loop: %s", asyncio.get_running_loop())
         self.received_value = value
         self.received_count += 1
         logger.info(
-            f"Receiver[{self.id}] updated: value={self.received_value}, count={self.received_count}"
+            "Receiver[%d] updated: value=%d, count=%d",
+            self.id, self.received_value, self.received_count
         )
 
     @t_slot
     def on_value_changed_sync(self, value: int):
-        print(f"Receiver[{self.id}] received value (sync): {value}")
+        """Sync slot for value changes"""
+        logger.info("Receiver[%d] on_value_changed_sync called with value: %d", self.id, value)
         self.received_value = value
         self.received_count += 1
-        print(
-            f"Receiver[{self.id}] updated (sync): value={self.received_value}, count={self.received_count}"
+        logger.info(
+            "Receiver[%d] updated (sync): value=%d, count=%d",
+            self.id, self.received_value, self.received_count
         )
 
 
 @pytest.fixture
 def receiver(event_loop):
+    """Create a receiver"""
     return Receiver()
 
 
 @pytest.fixture
 def sender(event_loop):
+    """Create a sender"""
     return Sender()
 
 
@@ -80,9 +97,8 @@ def setup_logging():
 
     # Can enable DEBUG mode via environment variable
 
-    default_level = logging.DEBUG
-    # if os.environ.get("TSIGNAL_DEBUG"):
-    #    default_level = logging.DEBUG
+    if os.environ.get("TSIGNAL_DEBUG"):
+        default_level = logging.DEBUG
 
     root.setLevel(default_level)
 

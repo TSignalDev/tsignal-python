@@ -1,7 +1,14 @@
-import pytest
+"""
+Test cases for the worker pattern.
+"""
+
+# pylint: disable=no-member
+# pylint: disable=redefined-outer-name
+# pylint: disable=unused-variable
+
 import asyncio
-import threading
 import logging
+import pytest
 from tsignal.contrib.patterns.worker.decorators import t_with_worker
 
 logger = logging.getLogger(__name__)
@@ -9,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture
 async def worker():
+    """Create a worker"""
     logger.info("Creating worker in fixture")
     w = TestWorker()
     yield w
@@ -23,6 +31,8 @@ async def worker():
 
 @t_with_worker
 class TestWorker:
+    """Test worker class"""
+
     def __init__(self):
         logger.info("Initializing TestWorker")
         self.initialize_called = False
@@ -31,27 +41,32 @@ class TestWorker:
         super().__init__()
 
     async def initialize(self, initial_value=None):
-        logger.info(f"TestWorker.initialize called with {initial_value}")
+        """Initialize the worker"""
+        logger.info("TestWorker.initialize called with %s", initial_value)
         self.initialize_called = True
         if initial_value:
             self.data.append(initial_value)
 
     async def finalize(self):
+        """Finalize the worker"""
         logger.info("TestWorker.finalize called")
         self.finalize_called = True
 
 
 def test_worker_requires_async_methods():
+    """Test that the worker requires async methods"""
     logger.info("Starting test_worker_requires_async_methods")
     with pytest.raises(TypeError, match=r".*initialize must be an async function"):
 
         @t_with_worker
         class InvalidWorker1:
+            """Invalid worker class"""
+
             def initialize(self):  # not async
-                pass
+                """Initialize the worker"""
 
             async def finalize(self):
-                pass
+                """Finalize the worker"""
 
     logger.info("First check passed")
 
@@ -59,17 +74,20 @@ def test_worker_requires_async_methods():
 
         @t_with_worker
         class InvalidWorker2:
+            """Invalid worker class"""
+
             async def initialize(self):
-                pass
+                """Initialize the worker"""
 
             def finalize(self):  # not async
-                pass
+                """Finalize the worker"""
 
     logger.info("Second check passed")
 
 
 @pytest.mark.asyncio
 async def test_worker_lifecycle(worker):
+    """Test the worker lifecycle"""
     logger.info("Starting test_worker_lifecycle")
     initial_value = "test"
 
@@ -85,9 +103,9 @@ async def test_worker_lifecycle(worker):
     logger.info("Waiting for worker initialization")
     for i in range(10):
         if worker.initialize_called:
-            logger.info(f"Worker initialized after {i+1} attempts")
+            logger.info("Worker initialized after %d attempts", i + 1)
             break
-        logger.info(f"Waiting attempt {i+1}")
+        logger.info("Waiting attempt %d", i + 1)
         await asyncio.sleep(0.1)
     else:
         logger.error("Worker failed to initialize")

@@ -1,4 +1,10 @@
-# Standard library imports
+"""
+Implementation of the Signal class for tsignal.
+
+Provides signal-slot communication pattern for event handling, supporting both
+synchronous and asynchronous operations in a thread-safe manner.
+"""
+
 import asyncio
 import functools
 import logging
@@ -8,11 +14,13 @@ from typing import Callable, List, Tuple, Optional, Union
 
 
 class TConnectionType(Enum):
-    DirectConnection = 1
-    QueuedConnection = 2
+    """Connection type for signal-slot connections."""
+    DIRECT_CONNECTION = 1
+    QUEUED_CONNECTION = 2
 
 
 class _SignalConstants:
+    """Constants for signal-slot communication."""
     FROM_EMIT = "_from_emit"
     THREAD = "_thread"
     LOOP = "_loop"
@@ -28,10 +36,11 @@ def _wrap_direct_function(func):
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        """Wrapper for directly connected functions"""
         # Remove FROM_EMIT
         kwargs.pop(_SignalConstants.FROM_EMIT, False)
 
-        # DirectConnection executes immediately regardless of thread
+        # DIRECT_CONNECTION executes immediately regardless of thread
         if is_coroutine:
             try:
                 loop = asyncio.get_event_loop()
@@ -45,8 +54,8 @@ def _wrap_direct_function(func):
 
 
 class TSignal:
+    """Signal class for tsignal."""
     def __init__(self):
-        """Initialize signal"""
         self.connections: List[Tuple[Optional[object], Callable, TConnectionType]] = []
 
     def connect(
@@ -56,7 +65,8 @@ class TSignal:
         if slot is None:
             if not callable(receiver_or_slot):
                 logger.error(
-                    f"Invalid connection attempt - receiver_or_slot is not callable: {receiver_or_slot}"
+                    "Invalid connection attempt - receiver_or_slot is not callable: %s",
+                    receiver_or_slot,
                 )
                 raise TypeError("When slot is not provided, receiver must be callable")
 
@@ -80,15 +90,16 @@ class TSignal:
             receiver = receiver_or_slot
             if not callable(slot):
                 logger.error(
-                    f"Invalid connection attempt - slot is not callable: {slot}"
+                    "Invalid connection attempt - slot is not callable: %s",
+                    slot,
                 )
                 raise TypeError("Slot must be callable")
 
         is_coroutine = asyncio.iscoroutinefunction(slot)
         conn_type = (
-            TConnectionType.QueuedConnection
+            TConnectionType.QUEUED_CONNECTION
             if is_coroutine
-            else TConnectionType.DirectConnection
+            else TConnectionType.DIRECT_CONNECTION
         )
         self.connections.append((receiver, slot, conn_type))
 
@@ -114,18 +125,18 @@ class TSignal:
 
         self.connections = new_connections
         disconnected = original_count - len(self.connections)
-        logger.debug(f"Disconnected {disconnected} connection(s)")
+        logger.debug("Disconnected %d connection(s)", disconnected)
         return disconnected
 
     def emit(self, *args, **kwargs):
+        """Emit signal to connected slots."""
         logger.debug("Signal emission started")
 
-        current_loop = asyncio.get_event_loop()
         for receiver, slot, conn_type in self.connections:
             try:
-                if conn_type == TConnectionType.DirectConnection:
+                if conn_type == TConnectionType.DIRECT_CONNECTION:
                     slot(*args, **kwargs)
-                else:  # QueuedConnection
+                else:  # QUEUED_CONNECTION
                     receiver_loop = getattr(receiver, "_loop", None)
                     if not receiver_loop:
                         logger.error("No event loop found for receiver")
@@ -171,6 +182,7 @@ def t_slot(func):
 
         @functools.wraps(func)
         async def wrapper(self, *args, **kwargs):
+            """Wrapper for coroutine slots"""
             from_emit = kwargs.pop(_SignalConstants.FROM_EMIT, False)
 
             if not hasattr(self, _SignalConstants.THREAD):
@@ -198,6 +210,7 @@ def t_slot(func):
 
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
+            """Wrapper for regular slots"""
             from_emit = kwargs.pop(_SignalConstants.FROM_EMIT, False)
 
             if not hasattr(self, _SignalConstants.THREAD):
@@ -215,7 +228,7 @@ def t_slot(func):
                 if current_thread != self._thread:
                     logger.debug("Executing regular slot from different thread")
                     self._loop.call_soon_threadsafe(lambda: func(self, *args, **kwargs))
-                    return
+                    return None
 
             return func(self, *args, **kwargs)
 

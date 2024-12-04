@@ -1,6 +1,10 @@
-import pytest
+"""
+Test cases for asynchronous operations.
+"""
+
 import asyncio
 import logging
+import pytest
 
 logger = logging.getLogger(__name__)
 
@@ -8,30 +12,34 @@ logger = logging.getLogger(__name__)
 @pytest.mark.asyncio
 async def test_multiple_async_slots(sender, receiver):
     """Test multiple async slots receiving signals"""
-    logger.info(f"Test starting with receiver[{receiver.id}]")
+    logger.info("Test starting with receiver[%s]", receiver.id)
     receiver2 = receiver.__class__()
-    logger.info(f"Created receiver2[{receiver2.id}]")
+    logger.info("Created receiver2[%s]", receiver2.id)
 
-    logger.info(f"Connecting receiver[{receiver.id}] to signal")
+    logger.info("Connecting receiver[%s] to signal", receiver.id)
     sender.value_changed.connect(receiver, receiver.on_value_changed)
-    logger.info(f"Connecting receiver2[{receiver2.id}] to signal")
+    logger.info("Connecting receiver2[%s] to signal", receiver2.id)
     sender.value_changed.connect(receiver2, receiver2.on_value_changed)
 
     logger.info("Emitting value 42")
     sender.emit_value(42)
 
     for i in range(5):
-        logger.info(f"Wait iteration {i+1}")
+        logger.info("Wait iteration %d", i + 1)
         if receiver.received_value is not None and receiver2.received_value is not None:
             logger.info("Both receivers have received values")
             break
         await asyncio.sleep(0.1)
 
     logger.info(
-        f"Final state - receiver1[{receiver.id}]: value={receiver.received_value}"
+        "Final state - receiver1[%s]: value=%d",
+        receiver.id,
+        receiver.received_value,
     )
     logger.info(
-        f"Final state - receiver2[{receiver2.id}]: value={receiver2.received_value}"
+        "Final state - receiver2[%s]: value=%d",
+        receiver2.id,
+        receiver2.received_value,
     )
 
     assert receiver.received_value == 42
@@ -52,5 +60,5 @@ async def test_async_slot_execution(sender, receiver):
             break
         await asyncio.sleep(0.1)
 
-    logger.info(f"Receiver value: {receiver.received_value}")
+    logger.info("Receiver value: %d", receiver.received_value)
     assert receiver.received_value == 42

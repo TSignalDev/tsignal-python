@@ -56,6 +56,14 @@ asyncio_default_fixture_loop_scope = "function"
 source = ["tsignal"]
 branch = true
 
+[tool.pylint]
+disable = [
+    "protected-access",
+    "too-few-public-methods",
+    "too-many-statements",
+    "broad-exception-caught"
+]
+
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
