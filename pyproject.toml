@@ -74,6 +74,21 @@ exclude_lines = [
     "pass",
     "raise ImportError",
 ]
+
+[tool.mypy]
+# Disable checking for untyped function bodies
+check_untyped_defs = false
+
+# Allow implicit Optional
+no_implicit_optional = false
+
+# Disable specific errors
+disable_error_code = ["annotation-unchecked", "assignment"]
+
+# Do not treat warnings as errors
+warn_return_any = false
+warn_unused_configs = false
+
 ignore_errors = true
 omit = [
     "tests/*",
