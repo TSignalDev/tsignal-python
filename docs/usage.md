@@ -1,5 +1,8 @@
 # Usage Guide
 
+## Requirements
+TSignal requires Python 3.10 or higher.
+
 ## Table of Contents
 1. [Basic Concepts](#basic-concepts)
 2. [Signals](#signals)
@@ -7,6 +10,7 @@
 4. [Connection Types](#connection-types)
 5. [Threading and Async](#threading-and-async)
 6. [Best Practices](#best-practices)
+7. [Worker Thread Pattern](#worker-thread-pattern)
 
 ## Basic Concepts
 TSignal implements the signal-slot pattern, which allows for loose coupling between components. The core concepts are:
@@ -71,18 +75,18 @@ class DataProcessor:
 ## Connection Types
 TSignal supports two types of connections:
 
-### DirectConnection
+### DIRECT_CONNECTION
 - Signal and slot execute in the same thread
 - Slot is called immediately when signal is emitted
 ```python
-signal.connect(receiver, slot, connection_type=TConnectionType.DirectConnection)
+signal.connect(receiver, slot, connection_type=TConnectionType.DIRECT_CONNECTION)
 ```
 
-### QueuedConnection
+### QUEUED_CONNECTION
 - Signal and slot can execute in different threads
 - Slot execution is queued in receiver's event loop
 ```python
-signal.connect(receiver, slot, connection_type=TConnectionType.QueuedConnection)
+signal.connect(receiver, slot, connection_type=TConnectionType.QUEUED_CONNECTION)
 ```
 
 Connection type is automatically determined based on:
@@ -277,3 +281,140 @@ This understanding of signal disconnection behavior is crucial for:
 - Ensuring proper resource cleanup
 - Managing complex async operations
 - Handling thread synchronization correctly
+
+## Signal Connection Types
+
+### Object-Member Connection
+Traditional signal-slot connection between objects:
+```python
+@t_with_signals
+class Sender:
+    @t_signal
+    def value_changed(self):
+        pass
+
+@t_with_signals
+class Receiver:
+    @t_slot
+    def on_value_changed(self, value):
+        print(f"Value: {value}")
+
+sender.value_changed.connect(receiver, receiver.on_value_changed)
+```
+
+### Function Connection
+Connect signals directly to functions or lambdas:
+```python
+# Standalone function
+def handle_value(value):
+    print(f"Value: {value}")
+sender.value_changed.connect(handle_value)
+
+# Lambda function
+sender.value_changed.connect(lambda x: print(f"Value: {x}"))
+```
+
+### Method Connection
+Connect to object methods without @t_slot decorator:
+```python
+class Handler:
+    def process(self, value):
+        print(f"Processing: {value}")
+
+handler = Handler()
+sender.value_changed.connect(handler.process)
+```
+
+### Connection Behavior Notes
+- Object-member connections are automatically disconnected when the receiver is destroyed
+- Function connections remain active until explicitly disconnected
+- Method connections behave like function connections and need manual cleanup
+
+## Worker Thread Pattern
+
+### Overview
+The worker pattern provides a convenient way to run operations in a background thread with built-in signal/slot support and task queuing.
+
+### Basic Worker
+```python
+@t_with_worker
+class ImageProcessor:
+    async def initialize(self, cache_size=100):
+        """Called when worker starts"""
+        self.cache = {}
+        self.cache_size = cache_size
+    
+    async def finalize(self):
+        """Called before worker stops"""
+        self.cache.clear()
+    
+    @t_signal
+    def processing_complete(self):
+        """Signal emitted when processing is done"""
+        pass
+    
+    async def process_image(self, image_data):
+        """Task to be executed in worker thread"""
+        result = await self.heavy_processing(image_data)
+        self.processing_complete.emit(result)
+
+# Usage
+processor = ImageProcessor()
+processor.start(cache_size=200)
+
+# Queue tasks
+await processor.queue_task(processor.process_image(data1))
+await processor.queue_task(processor.process_image(data2))
+
+# Cleanup
+processor.stop()
+```
+
+### Worker Features
+
+#### Thread Safety
+- All signal emissions are thread-safe
+- Task queue is thread-safe
+- Worker has its own event loop
+
+#### Task Queue
+- Tasks are executed sequentially
+- Tasks must be coroutines
+- Queue is processed in worker thread
+
+#### Lifecycle Management
+```python
+@t_with_worker
+class Worker:
+    async def initialize(self, *args, **kwargs):
+        # Setup code
+        self.resources = await setup_resources()
+    
+    async def finalize(self):
+        # Cleanup code
+        await self.resources.cleanup()
+    
+    async def some_task(self):
+        # Will run in worker thread
+        await self.resources.process()
+
+worker = Worker()
+try:
+    worker.start()
+    await worker.queue_task(worker.some_task())
+finally:
+    worker.stop()  # Ensures cleanup
+```
+
+#### Combining with Signals
+Workers can use signals to communicate results:
+```python
+@t_with_worker
+class DataProcessor:
+    def __init__(self):
+        super().__init__()
+        self.results = []
+    
+    @t_signal
+    def processing_done(self):
+        """Emitted when batch is

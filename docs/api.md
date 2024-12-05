@@ -36,6 +36,43 @@ async def on_async_signal(self, *args, **kwargs):
     pass
 ```
 
+### `@t_with_worker`
+Class decorator that creates a worker thread with signal support and task queue.
+
+**Requirements:**
+- Class must implement async `initialize(self, *args, **kwargs)` method
+- Class must implement async `finalize(self)` method
+
+**Added Methods:**
+##### `start(*args, **kwargs) -> None`
+Starts the worker thread and calls initialize with given arguments.
+
+##### `stop() -> None`
+Stops the worker thread gracefully, calling finalize.
+
+##### `async queue_task(coro) -> None`
+Queues a coroutine for execution in the worker thread.
+
+**Example:**
+```python
+@t_with_worker
+class Worker:
+    async def initialize(self):
+        print("Worker initialized")
+    
+    async def finalize(self):
+        print("Worker cleanup")
+    
+    async def process(self):
+        await asyncio.sleep(1)
+        print("Processing done")
+
+worker = Worker()
+worker.start()
+await worker.queue_task(worker.process())
+worker.stop()
+```
+
 ## Classes
 
 ### `TSignal`
@@ -43,13 +80,44 @@ Base class for signals.
 
 #### Methods
 
-##### `connect(receiver: object, slot: Callable, connection_type: Optional[TConnectionType] = None) -> None`
+##### `connect(receiver_or_slot: Union[object, Callable], slot: Optional[Callable] = None) -> None`
 Connects the signal to a slot.
 
 **Parameters:**
-- `receiver`: Object that contains the slot
-- `slot`: Callable that will receive the signal
-- `connection_type`: Optional connection type (DirectConnection or QueuedConnection)
+- When connecting to a QObject slot:
+  - `receiver_or_slot`: The receiver object
+  - `slot`: The slot method of the receiver
+
+- When connecting to a function/lambda:
+  - `receiver_or_slot`: The callable (function, lambda, or method)
+  - `slot`: None
+
+**Connection Behavior:**
+1. Object Method with Signal Support:
+   ```python
+   @t_with_signals
+   class Receiver:
+       def on_signal(self, value):
+           print(value)
+   
+   receiver = Receiver()
+   signal.connect(receiver.on_signal)  # Automatically sets up receiver
+   ```
+
+2. Regular Object Method:
+   ```python
+   class RegularClass:
+       def on_signal(self, value):
+           print(value)
+   
+   obj = RegularClass()
+   signal.connect(obj.on_signal)  # Treated as direct connection
+   ```
+
+The connection type is automatically determined:
+- Methods from objects with `@t_with_signals` are set up with their object as receiver
+- Regular object methods are treated as direct connections
+- Async methods always use queued connections
 
 ##### `disconnect(receiver: Optional[object] = None, slot: Optional[Callable] = None) -> int`
 Disconnects one or more slots from the signal.
@@ -104,18 +172,8 @@ Emits the signal with the given arguments.
 Enum defining connection types.
 
 #### Values:
-- `DirectConnection`: Slot is called directly in the emitting thread
-- `QueuedConnection`: Slot is queued in the receiver's event loop
-
-## Constants
-
-### `TSignalConstants`
-Constants used by the TSignal system.
-
-#### Values:
-- `FROM_EMIT`: Key for emission context
-- `THREAD`: Key for thread storage
-- `LOOP`: Key for event loop storage
+- `DIRECT_CONNECTION`: Slot is called directly in the emitting thread
+- `QUEUED_CONNECTION`: Slot is queued in the receiver's event loop
 
 ## Usage Examples
 
@@ -164,14 +222,14 @@ asyncio.run(main())
 sender.value_changed.connect(
     receiver,
     receiver.on_value_changed,
-    connection_type=TConnectionType.DirectConnection
+    connection_type=TConnectionType.DIRECT_CONNECTION
 )
 
 # Force queued connection
 sender.value_changed.connect(
     receiver,
     receiver.on_value_changed,
-    connection_type=TConnectionType.QueuedConnection
+    connection_type=TConnectionType.QUEUED_CONNECTION
 )
 ```
 

@@ -1,5 +1,9 @@
-import pytest
+"""
+Test cases for the slot pattern.
+"""
+
 import asyncio
+import pytest
 from tsignal import t_with_signals, t_slot
 
 
@@ -28,8 +32,10 @@ def test_slot_exception(sender, receiver, event_loop):
 
     @t_with_signals
     class ExceptionReceiver:
+        """Receiver class for exception testing"""
         @t_slot
         async def on_value_changed(self, value):
+            """Slot for value changed"""
             raise ValueError("Test exception")
 
     exception_receiver = ExceptionReceiver()

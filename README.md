@@ -70,6 +70,7 @@ asyncio.run(main())
 ```
 
 ## Features
+- Requires Python 3.10+
 - Easy-to-use signal-slot mechanism with decorators
 - Support for both synchronous and asynchronous slots
 - Thread-safe signal emissions
@@ -78,7 +79,7 @@ asyncio.run(main())
 
 ## Installation
 
-Currently, this package is under development. You can install it directly from the repository:
+TSignal requires Python 3.10 or higher. You can install it directly from the repository:
 
 ```bash
 git clone https://github.com/tsignal/tsignal-python.git
@@ -132,3 +133,88 @@ Please see [Contributing Guidelines](CONTRIBUTING.md) for details on how to cont
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Connecting Signals and Slots
+
+### Classic Object-Member Connection
+```python
+@t_with_signals
+class Counter:
+    @t_signal
+    def count_changed(self):
+        pass
+
+@t_with_signals
+class Display:
+    @t_slot
+    def on_count_changed(self, value):
+        print(f"Count is now: {value}")
+
+counter = Counter()
+display = Display()
+counter.count_changed.connect(display, display.on_count_changed)
+```
+
+### Function Connection
+```python
+# Connect to a simple function
+def print_value(value):
+    print(f"Value: {value}")
+    
+counter.count_changed.connect(print_value)
+
+# Connect to a lambda
+counter.count_changed.connect(lambda x: print(f"Lambda received: {x}"))
+
+# Connect to an object method without @t_slot
+class Handler:
+    def process_value(self, value):
+        print(f"Processing: {value}")
+        
+handler = Handler()
+counter.count_changed.connect(handler.process_value)
+```
+
+## Worker Thread Pattern
+
+TSignal provides a worker thread pattern that combines thread management with signal/slot communication and task queuing:
+
+```python
+from tsignal import t_with_worker
+
+@t_with_worker
+class DataProcessor:
+    async def initialize(self, config=None):
+        # Setup worker (called in worker thread)
+        self.config = config or {}
+    
+    async def process_data(self, data):
+        # Heavy processing in worker thread
+        result = await heavy_computation(data)
+        self.processing_done.emit(result)
+    
+    async def finalize(self):
+        # Cleanup worker (called before thread stops)
+        await self.cleanup()
+
+    @t_signal
+    def processing_done(self):
+        pass
+
+# Usage
+processor = DataProcessor()
+processor.start(config={'threads': 4})  # Starts worker thread
+
+# Queue task in worker thread
+await processor.queue_task(processor.process_data(some_data))
+
+# Stop worker
+processor.stop()  # Graceful shutdown
+```
+
+The worker pattern provides:
+- Dedicated worker thread with event loop
+- Built-in signal/slot support
+- Async task queue
+- Graceful initialization/shutdown
+- Thread-safe communication

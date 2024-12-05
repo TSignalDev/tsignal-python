@@ -1,4 +1,7 @@
-import pytest
+"""
+Test cases for the with-signal pattern.
+"""
+
 import asyncio
 from tests.conftest import Receiver
 
@@ -25,6 +28,7 @@ def test_multiple_slots(sender, event_loop):
     sender.value_changed.connect(receiver2, receiver2.on_value_changed)
 
     async def test():
+        """Test the multiple slot connections"""
         sender.emit_value(42)
         await asyncio.sleep(0.1)
         assert receiver1.received_value == 42
