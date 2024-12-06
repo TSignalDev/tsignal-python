@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tsignal"
-version = "0.2.0"
+version = "0.2.1"
 description = "A Python Signal-Slot library inspired by Qt"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,10 +25,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tsignal/tsignal-python"
-Repository = "https://github.com/tsignal/tsignal-python"
-Documentation = "https://github.com/tsignal/tsignal-python#readme"
-Issues = "https://github.com/tsignal/tsignal-python/issues"
+Homepage = "https://github.com/TSignalDev/tsignal-python"
+Repository = "https://github.com/TSignalDev/tsignal-python"
+Documentation = "https://github.com/TSignalDev/tsignal-python#readme"
+Issues = "https://github.com/TSignalDev/tsignal-python/issues"
 
 [project.optional-dependencies]
 dev = [
