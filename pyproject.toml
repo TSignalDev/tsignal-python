@@ -89,8 +89,6 @@ disable_error_code = ["annotation-unchecked", "assignment"]
 warn_return_any = false
 warn_unused_configs = false
 
+exclude = "tests/|setup.py"
+
 ignore_errors = true
-omit = [
-    "tests/*",
-    "setup.py",
-]

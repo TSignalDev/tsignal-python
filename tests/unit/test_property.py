@@ -1,9 +1,17 @@
-import pytest
+"""
+Test cases for the property pattern.
+"""
+
+# pylint: disable=no-member
+# pylint: disable=unnecessary-lambda
+# pylint: disable=useless-with-lock
+
 import asyncio
 import threading
+import logging
+import pytest
 from tsignal.contrib.extensions.property import t_property
 from tsignal import t_signal, t_with_signals
-import logging
 
 
 logger = logging.getLogger(__name__)
@@ -11,35 +19,42 @@ logger = logging.getLogger(__name__)
 
 @t_with_signals
 class Temperature:
+    """Temperature class for testing"""
+
     def __init__(self):
         super().__init__()
         self._celsius = -273
 
     @t_signal
     def celsius_changed(self):
-        pass
+        """Signal for celsius change"""
 
     @t_property(notify=celsius_changed)
     def celsius(self) -> float:
+        """Getter for celsius"""
         return self._celsius
 
     @celsius.setter
     def celsius(self, value: float):
+        """Setter for celsius"""
         self._celsius = value
 
 
 @t_with_signals
 class ReadOnlyTemperature:
+    """ReadOnlyTemperature class for testing"""
+
     def __init__(self):
         super().__init__()
         self._celsius = 0
 
     @t_signal
     def celsius_changed(self):
-        pass
+        """Signal for celsius change"""
 
     @t_property(notify=celsius_changed)
     def celsius(self) -> float:
+        """Getter for celsius"""
         return self._celsius
 
 
@@ -96,9 +111,7 @@ async def test_property_thread_safety():
     """Test property thread safety and notifications across threads"""
     temp = Temperature()
     received_values = []
-    logger.debug(f"test_property_thread_safety #3")
     task_completed = asyncio.Event()
-    logger.debug(f"test_property_thread_safety #4")
     main_loop = asyncio.get_running_loop()
 
     def background_task():
@@ -122,7 +135,6 @@ async def test_property_thread_safety():
     thread = threading.Thread(target=background_task)
     thread.start()
 
-    # asyncio.Event의 wait() 사용
     await task_completed.wait()
 
     thread.join()
@@ -138,18 +150,20 @@ async def test_property_multiple_threads():
     received_values = []
     values_lock = threading.Lock()
     threads_lock = threading.Lock()
-    NUM_THREADS = 5
+    num_threads = 5
     task_completed = asyncio.Event()
     threads_done = 0
     main_loop = asyncio.get_running_loop()
 
     def on_celsius_changed(value):
+        """Handler for celsius change"""
         with values_lock:
             received_values.append(value)
 
     temp.celsius_changed.connect(on_celsius_changed)
 
     def background_task(value):
+        """Background task for thread safety testing"""
         nonlocal threads_done
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -164,31 +178,31 @@ async def test_property_multiple_threads():
             with threading.Lock():
                 nonlocal threads_done
                 threads_done += 1
-                if threads_done == NUM_THREADS:
+                if threads_done == num_threads:
                     main_loop.call_soon_threadsafe(task_completed.set)
 
     threads = [
         threading.Thread(target=background_task, args=(i * 10,))
-        for i in range(NUM_THREADS)
+        for i in range(num_threads)
     ]
 
-    logger.debug("Starting threads")
+    # Start threads
     for thread in threads:
         thread.start()
 
-    logger.debug("Waiting for task_completed event")
+    # Wait for task completion
     try:
         await asyncio.wait_for(task_completed.wait(), timeout=2.0)
     except asyncio.TimeoutError:
         logger.warning("Timeout waiting for threads")
 
-    logger.debug("Joining threads")
+    # Join threads
     for thread in threads:
         thread.join()
 
     await asyncio.sleep(0.2)
 
-    expected_values = set(i * 10 for i in range(NUM_THREADS))
+    expected_values = set(i * 10 for i in range(num_threads))
     received_set = set(received_values)
 
     assert (
@@ -207,10 +221,12 @@ def test_property_exception_handling():
     received_values = []
 
     def handler_with_exception(value):
+        """Handler with exception"""
         received_values.append(value)
         raise ValueError("Test exception")
 
     def normal_handler(value):
+        """Normal handler"""
         received_values.append(value * 2)
 
     # Connect multiple handlers

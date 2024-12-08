@@ -2,12 +2,14 @@
 Test cases for the slot pattern.
 """
 
+# pylint: disable=no-member
+
 import asyncio
 import threading
 import time
+import logging
 import pytest
 from tsignal import t_with_signals, t_slot
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +67,8 @@ async def test_slot_thread_safety():
 
     @t_with_signals
     class ThreadTestReceiver:
+        """Receiver class for thread safety testing"""
+
         def __init__(self):
             super().__init__()
             self.received_value = None
@@ -73,6 +77,7 @@ async def test_slot_thread_safety():
 
         @t_slot
         async def async_slot(self, value):
+            """Async slot for thread safety testing"""
             self.execution_thread = threading.current_thread()
             await asyncio.sleep(0.1)  # work simulation with sleep
             self.received_value = value
@@ -80,6 +85,7 @@ async def test_slot_thread_safety():
 
         @t_slot
         def sync_slot(self, value):
+            """Sync slot for thread safety testing"""
             self.execution_thread = threading.current_thread()
             time.sleep(0.1)  # work simulation with sleep
             self.received_value = value
@@ -91,6 +97,7 @@ async def test_slot_thread_safety():
     initial_values = {"value": None, "count": 0}  # save initial values
 
     def background_task():
+        """Background task for thread safety testing"""
         try:
             # Before async_slot call
             initial_values["value"] = receiver.received_value
@@ -121,6 +128,7 @@ async def test_slot_thread_safety():
             task_completed.set()
 
     async def run_test():
+        """Run test for thread safety"""
         thread = threading.Thread(target=background_task)
         thread.start()
 
@@ -132,20 +140,20 @@ async def test_slot_thread_safety():
         # Cleanup
         pending = asyncio.all_tasks(receiver._loop)
         if pending:
-            logger.debug(f"Cleaning up {len(pending)} pending tasks")
+            logger.debug("Cleaning up %d pending tasks", len(pending))
             for task in pending:
                 if "test_slot_thread_safety" in str(task.get_coro()):
-                    logger.debug(f"Skipping test function task: {task}")
+                    logger.debug("Skipping test function task: %s", task)
                 else:
-                    logger.debug(f"Found application task: {task}")
+                    logger.debug("Found application task: %s", task)
                     try:
                         await asyncio.gather(task, return_exceptions=True)
                     except Exception as e:
-                        logger.error(f"Error during cleanup: {e}")
+                        logger.error("Error during cleanup: %s", e)
         else:
             logger.debug("No pending tasks to clean up")
 
     try:
         await run_test()
     except Exception as e:
-        logger.error(f"Error in test: {e}")
+        logger.error("Error in test: %s", e)

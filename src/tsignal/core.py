@@ -238,7 +238,6 @@ def t_slot(func):
                 current_thread = threading.current_thread()
                 if current_thread != self._thread:
                     logger.debug("Executing regular slot from different thread")
-                    # 동기 함수는 loop.call_soon_threadsafe와 Future를 사용
                     future = concurrent.futures.Future()
 
                     def callback():
