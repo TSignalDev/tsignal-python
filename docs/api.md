@@ -250,3 +250,45 @@ except AttributeError as e:
 except TypeError as e:
     logging.error(f"Invalid slot: {e}")
 ```
+
+## Slot Execution Behavior
+
+### Direct Slot Calls vs Signal Emissions
+
+Slots can be executed in two ways:
+
+#### Direct Calls
+```python
+# Synchronous slot direct call
+receiver.some_slot(value)  # Blocks until execution is complete
+
+# Asynchronous slot direct call 
+await receiver.async_slot(value)  # Can wait for completion with await
+```
+
+- Behaves like a regular function call
+- The calling thread blocks until execution is complete
+- For asynchronous slots, it can wait for completion using await
+- The same blocking behavior occurs when called from another thread
+
+#### Calls via Signal (emit)
+```python
+# Call via emit
+signal.emit(value)  # Returns immediately, executes asynchronously
+```
+
+- Executes asynchronously (returns immediately)
+- The slot is queued in the receiver's event loop
+- Does not wait for execution to complete
+- Disconnecting does not affect already queued slot executions
+
+Understanding these differences is particularly important in a multithreaded environment:
+```python
+# Direct call - waits for completion
+async def direct_call():
+    await receiver.async_slot()  # Blocks until complete
+
+# Emit - returns immediately
+def emit_call():
+    signal.emit()  # Returns immediately, slot executes in the background
+```

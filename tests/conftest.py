@@ -20,6 +20,12 @@ from tsignal import t_with_signals, t_signal, t_slot
 logger = logging.getLogger(__name__)
 
 
+def log_debug(message):
+    """Log a debug message if DEBUG level is enabled."""
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(message)
+
+
 @pytest.fixture(scope="function")
 def event_loop():
     """Create an event loop"""
@@ -28,9 +34,11 @@ def event_loop():
     yield loop
     loop.close()
 
+
 @t_with_signals
 class Sender:
     """Sender class"""
+
     @t_signal
     def value_changed(self, value):
         """Signal for value changes"""
@@ -39,9 +47,11 @@ class Sender:
         """Emit a value change signal"""
         self.value_changed.emit(value)
 
+
 @t_with_signals
 class Receiver:
     """Receiver class"""
+
     def __init__(self):
         super().__init__()
         self.received_value = None
@@ -52,25 +62,33 @@ class Receiver:
     @t_slot
     async def on_value_changed(self, value: int):
         """Slot for value changes"""
-        logger.info("Receiver[%d] on_value_changed called with value: %d", self.id, value)
+        logger.info(
+            "Receiver[%d] on_value_changed called with value: %d", self.id, value
+        )
         logger.info("Current thread: %s", threading.current_thread().name)
         logger.info("Current event loop: %s", asyncio.get_running_loop())
         self.received_value = value
         self.received_count += 1
         logger.info(
             "Receiver[%d] updated: value=%d, count=%d",
-            self.id, self.received_value, self.received_count
+            self.id,
+            self.received_value,
+            self.received_count,
         )
 
     @t_slot
     def on_value_changed_sync(self, value: int):
         """Sync slot for value changes"""
-        logger.info("Receiver[%d] on_value_changed_sync called with value: %d", self.id, value)
+        logger.info(
+            "Receiver[%d] on_value_changed_sync called with value: %d", self.id, value
+        )
         self.received_value = value
         self.received_count += 1
         logger.info(
             "Receiver[%d] updated (sync): value=%d, count=%d",
-            self.id, self.received_value, self.received_count
+            self.id,
+            self.received_value,
+            self.received_count,
         )
 
 
@@ -101,6 +119,7 @@ def setup_logging():
         default_level = logging.DEBUG
 
     root.setLevel(default_level)
+    logger.debug("Logging level set to: %s", default_level)
 
     # Removing existing handlers
     for handler in root.handlers:

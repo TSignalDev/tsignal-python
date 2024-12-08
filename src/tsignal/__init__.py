@@ -7,6 +7,7 @@ from .core import (
     t_signal,
     t_slot,
     TConnectionType,
+    TSignalConstants,
 )
 from .contrib.patterns.worker.decorators import t_with_worker
 
@@ -18,4 +19,5 @@ __all__ = [
     "t_slot",
     "t_with_worker",
     "TConnectionType",
+    "TSignalConstants",
 ]

@@ -11,16 +11,19 @@ import logging
 import threading
 from enum import Enum
 from typing import Callable, List, Tuple, Optional, Union
+import concurrent.futures
 
 
 class TConnectionType(Enum):
     """Connection type for signal-slot connections."""
+
     DIRECT_CONNECTION = 1
     QUEUED_CONNECTION = 2
 
 
-class _SignalConstants:
+class TSignalConstants:
     """Constants for signal-slot communication."""
+
     FROM_EMIT = "_from_emit"
     THREAD = "_thread"
     LOOP = "_loop"
@@ -38,7 +41,7 @@ def _wrap_direct_function(func):
     def wrapper(*args, **kwargs):
         """Wrapper for directly connected functions"""
         # Remove FROM_EMIT
-        kwargs.pop(_SignalConstants.FROM_EMIT, False)
+        kwargs.pop(TSignalConstants.FROM_EMIT, False)
 
         # DIRECT_CONNECTION executes immediately regardless of thread
         if is_coroutine:
@@ -55,6 +58,7 @@ def _wrap_direct_function(func):
 
 class TSignal:
     """Signal class for tsignal."""
+
     def __init__(self):
         self.connections: List[Tuple[Optional[object], Callable, TConnectionType]] = []
 
@@ -74,8 +78,8 @@ class TSignal:
 
             if hasattr(receiver_or_slot, "__self__"):
                 obj = receiver_or_slot.__self__
-                if hasattr(obj, _SignalConstants.THREAD) and hasattr(
-                    obj, _SignalConstants.LOOP
+                if hasattr(obj, TSignalConstants.THREAD) and hasattr(
+                    obj, TSignalConstants.LOOP
                 ):
                     receiver = obj
                     slot = receiver_or_slot
@@ -161,17 +165,24 @@ class TSignal:
                 logger.error("Error in signal emission: %s", e, exc_info=True)
 
 
+class TSignalProperty(property):
+    def __init__(self, fget, signal_name):
+        super().__init__(fget)
+        self.signal_name = signal_name
+
+
 def t_signal(func):
     """Signal decorator"""
     sig_name = func.__name__
 
-    @property
+    # Using @property for lazy initialization of the signal.
+    # The signal object is created only when first accessed, and a cached object is returned thereafter.
     def wrapper(self):
         if not hasattr(self, f"_{sig_name}"):
             setattr(self, f"_{sig_name}", TSignal())
         return getattr(self, f"_{sig_name}")
 
-    return wrapper
+    return TSignalProperty(wrapper, sig_name)
 
 
 def t_slot(func):
@@ -183,12 +194,12 @@ def t_slot(func):
         @functools.wraps(func)
         async def wrapper(self, *args, **kwargs):
             """Wrapper for coroutine slots"""
-            from_emit = kwargs.pop(_SignalConstants.FROM_EMIT, False)
+            from_emit = kwargs.pop(TSignalConstants.FROM_EMIT, False)
 
-            if not hasattr(self, _SignalConstants.THREAD):
+            if not hasattr(self, TSignalConstants.THREAD):
                 self._thread = threading.current_thread()
 
-            if not hasattr(self, _SignalConstants.LOOP):
+            if not hasattr(self, TSignalConstants.LOOP):
                 try:
                     self._loop = asyncio.get_running_loop()
                 except RuntimeError:
@@ -211,12 +222,12 @@ def t_slot(func):
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             """Wrapper for regular slots"""
-            from_emit = kwargs.pop(_SignalConstants.FROM_EMIT, False)
+            from_emit = kwargs.pop(TSignalConstants.FROM_EMIT, False)
 
-            if not hasattr(self, _SignalConstants.THREAD):
+            if not hasattr(self, TSignalConstants.THREAD):
                 self._thread = threading.current_thread()
 
-            if not hasattr(self, _SignalConstants.LOOP):
+            if not hasattr(self, TSignalConstants.LOOP):
                 try:
                     self._loop = asyncio.get_running_loop()
                 except RuntimeError:
@@ -227,8 +238,18 @@ def t_slot(func):
                 current_thread = threading.current_thread()
                 if current_thread != self._thread:
                     logger.debug("Executing regular slot from different thread")
-                    self._loop.call_soon_threadsafe(lambda: func(self, *args, **kwargs))
-                    return None
+                    # 동기 함수는 loop.call_soon_threadsafe와 Future를 사용
+                    future = concurrent.futures.Future()
+
+                    def callback():
+                        try:
+                            result = func(self, *args, **kwargs)
+                            future.set_result(result)
+                        except Exception as e:
+                            future.set_exception(e)
+
+                    self._loop.call_soon_threadsafe(callback)
+                    return future.result()
 
             return func(self, *args, **kwargs)
 
@@ -240,6 +261,7 @@ def t_with_signals(cls):
     original_init = cls.__init__
 
     def __init__(self, *args, **kwargs):
+        logger.debug("t_with_signals __init__")
         # Set thread and event loop
         self._thread = threading.current_thread()
         try:
