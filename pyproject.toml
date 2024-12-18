@@ -63,6 +63,7 @@ disable = [
     "too-many-statements",
     "broad-exception-caught"
 ]
+max-line-length = 140
 
 [tool.coverage.report]
 exclude_lines = [

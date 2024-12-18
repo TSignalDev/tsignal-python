@@ -1,3 +1,5 @@
+# tests/conftest.py
+
 """
 Shared fixtures for tests.
 """
@@ -14,23 +16,17 @@ import asyncio
 import threading
 import logging
 import pytest
+import pytest_asyncio
 from tsignal import t_with_signals, t_signal, t_slot
 
 # Only creating the logger without configuration
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture(scope="function")
-def event_loop():
-    """Create an event loop"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
-
 @t_with_signals
 class Sender:
     """Sender class"""
+
     @t_signal
     def value_changed(self, value):
         """Signal for value changes"""
@@ -39,11 +35,16 @@ class Sender:
         """Emit a value change signal"""
         self.value_changed.emit(value)
 
+
 @t_with_signals
 class Receiver:
     """Receiver class"""
+
     def __init__(self):
         super().__init__()
+
+        logger.debug("[Receiver][__init__] self=%s", self)
+
         self.received_value = None
         self.received_count = 0
         self.id = id(self)
@@ -52,37 +53,47 @@ class Receiver:
     @t_slot
     async def on_value_changed(self, value: int):
         """Slot for value changes"""
-        logger.info("Receiver[%d] on_value_changed called with value: %d", self.id, value)
+        logger.info(
+            "Receiver[%d] on_value_changed called with value: %d", self.id, value
+        )
         logger.info("Current thread: %s", threading.current_thread().name)
         logger.info("Current event loop: %s", asyncio.get_running_loop())
         self.received_value = value
         self.received_count += 1
         logger.info(
             "Receiver[%d] updated: value=%d, count=%d",
-            self.id, self.received_value, self.received_count
+            self.id,
+            self.received_value,
+            self.received_count,
         )
 
     @t_slot
     def on_value_changed_sync(self, value: int):
         """Sync slot for value changes"""
-        logger.info("Receiver[%d] on_value_changed_sync called with value: %d", self.id, value)
+        logger.info(
+            "Receiver[%d] on_value_changed_sync called with value: %d", self.id, value
+        )
         self.received_value = value
         self.received_count += 1
         logger.info(
             "Receiver[%d] updated (sync): value=%d, count=%d",
-            self.id, self.received_value, self.received_count
+            self.id,
+            self.received_value,
+            self.received_count,
         )
 
 
-@pytest.fixture
-def receiver(event_loop):
+@pytest_asyncio.fixture
+async def receiver():
     """Create a receiver"""
+    logger.info("Creating receiver. event loop: %s", asyncio.get_running_loop())
     return Receiver()
 
 
-@pytest.fixture
-def sender(event_loop):
+@pytest_asyncio.fixture
+async def sender():
     """Create a sender"""
+    logger.info("Creating receiver. event loop: %s", asyncio.get_running_loop())
     return Sender()
 
 
@@ -94,6 +105,7 @@ def setup_logging():
 
     # Setting to WARNING level by default
     default_level = logging.WARNING
+    # default_level = logging.DEBUG
 
     # Can enable DEBUG mode via environment variable
 
@@ -101,6 +113,7 @@ def setup_logging():
         default_level = logging.DEBUG
 
     root.setLevel(default_level)
+    logger.debug("Logging level set to: %s", default_level)
 
     # Removing existing handlers
     for handler in root.handlers:

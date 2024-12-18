@@ -1,3 +1,5 @@
+# tests/integration/test_async.py
+
 """
 Test cases for asynchronous operations.
 """
@@ -12,6 +14,7 @@ logger = logging.getLogger(__name__)
 @pytest.mark.asyncio
 async def test_multiple_async_slots(sender, receiver):
     """Test multiple async slots receiving signals"""
+
     logger.info("Test starting with receiver[%s]", receiver.id)
     receiver2 = receiver.__class__()
     logger.info("Created receiver2[%s]", receiver2.id)
@@ -49,6 +52,7 @@ async def test_multiple_async_slots(sender, receiver):
 @pytest.mark.asyncio
 async def test_async_slot_execution(sender, receiver):
     """Test async slot execution with event loop"""
+
     logger.info("Starting test_async_slot_execution")
     sender.value_changed.connect(receiver, receiver.on_value_changed)
 

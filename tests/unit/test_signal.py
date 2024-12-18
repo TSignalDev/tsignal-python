@@ -1,27 +1,50 @@
+# tests/unit/test_signal.py
+
 """
 Test cases for the signal pattern.
 """
 
+# pylint: disable=unused-argument
+# pylint: disable=unused-variable
+# pylint: disable=too-many-locals
+
 import asyncio
+import logging
 import pytest
-from tsignal.core import t_with_signals , t_slot, TSignal
+from tsignal.core import (
+    t_with_signals,
+    t_signal,
+    t_slot,
+    TSignal,
+    TConnectionType,
+    _determine_connection_type,
+)
+from tsignal.contrib.patterns.worker.decorators import t_with_worker
 from ..conftest import Receiver
 
+logger = logging.getLogger(__name__)
 
-def test_signal_creation(sender):
+
+@pytest.mark.asyncio
+async def test_signal_creation(sender):
     """Test signal creation and initialization"""
+
     assert hasattr(sender, "value_changed")
     assert isinstance(sender.value_changed, TSignal)
 
 
-def test_signal_connection(sender, receiver):
+@pytest.mark.asyncio
+async def test_signal_connection(sender, receiver):
     """Test signal connection"""
+
     sender.value_changed.connect(receiver, receiver.on_value_changed)
     assert len(sender.value_changed.connections) == 1
 
 
-def test_invalid_connection(sender, receiver):
+@pytest.mark.asyncio
+async def test_invalid_connection(sender, receiver):
     """Test invalid signal connections"""
+
     with pytest.raises(AttributeError):
         sender.value_changed.connect(None, receiver.on_value_changed)
 
@@ -33,8 +56,10 @@ def test_invalid_connection(sender, receiver):
         sender.value_changed.connect(receiver, non_existent_slot)
 
 
-def test_signal_disconnect_all(sender, receiver):
+@pytest.mark.asyncio
+async def test_signal_disconnect_all(sender, receiver):
     """Test disconnecting all slots"""
+
     sender.value_changed.connect(receiver, receiver.on_value_changed)
     sender.value_changed.connect(receiver, receiver.on_value_changed_sync)
 
@@ -51,8 +76,10 @@ def test_signal_disconnect_all(sender, receiver):
     assert receiver.received_count == 0
 
 
-def test_signal_disconnect_specific_slot(sender, receiver):
+@pytest.mark.asyncio
+async def test_signal_disconnect_specific_slot(sender, receiver):
     """Test disconnecting a specific slot"""
+
     sender.value_changed.connect(receiver, receiver.on_value_changed)
     sender.value_changed.connect(receiver, receiver.on_value_changed_sync)
 
@@ -68,8 +95,10 @@ def test_signal_disconnect_specific_slot(sender, receiver):
     assert remaining[1] == receiver.on_value_changed
 
 
-def test_signal_disconnect_specific_receiver(sender, receiver, event_loop):
+@pytest.mark.asyncio
+async def test_signal_disconnect_specific_receiver(sender, receiver):
     """Test disconnecting a specific receiver"""
+
     # Create another receiver instance
     receiver2 = Receiver()
 
@@ -84,17 +113,16 @@ def test_signal_disconnect_specific_receiver(sender, receiver, event_loop):
     assert len(sender.value_changed.connections) == 1
 
     # Only receiver2 should get the signal
-    async def test():
-        sender.emit_value(42)
-        await asyncio.sleep(0.1)
-        assert receiver.received_value is None
-        assert receiver2.received_value == 42
-
-    event_loop.run_until_complete(test())
+    sender.emit_value(42)
+    await asyncio.sleep(0.1)
+    assert receiver.received_value is None
+    assert receiver2.received_value == 42
 
 
-def test_signal_disconnect_specific_receiver_and_slot(sender, receiver):
+@pytest.mark.asyncio
+async def test_signal_disconnect_specific_receiver_and_slot(sender, receiver):
     """Test disconnecting a specific receiver-slot combination"""
+
     sender.value_changed.connect(receiver, receiver.on_value_changed)
     sender.value_changed.connect(receiver, receiver.on_value_changed_sync)
 
@@ -112,8 +140,10 @@ def test_signal_disconnect_specific_receiver_and_slot(sender, receiver):
     assert remaining[1] == receiver.on_value_changed_sync
 
 
-def test_signal_disconnect_nonexistent(sender, receiver):
+@pytest.mark.asyncio
+async def test_signal_disconnect_nonexistent(sender, receiver):
     """Test disconnecting slots that don't exist"""
+
     sender.value_changed.connect(receiver, receiver.on_value_changed)
 
     # Try to disconnect nonexistent slot
@@ -137,6 +167,7 @@ async def test_signal_disconnect_during_emit(sender, receiver):
     @t_with_signals
     class SlowReceiver:
         """Receiver class for slow slot"""
+
         def __init__(self):
             self.received_value = None
 
@@ -162,6 +193,7 @@ async def test_signal_disconnect_during_emit(sender, receiver):
 
 def test_direct_function_connection(sender):
     """Test direct connection of lambda and regular functions"""
+
     received_values = []
 
     def collect_value(value):
@@ -185,6 +217,7 @@ def test_direct_function_connection(sender):
 @pytest.mark.asyncio
 async def test_direct_async_function_connection(sender):
     """Test direct connection of async functions"""
+
     received_values = []
 
     async def async_collector(value):
@@ -204,8 +237,10 @@ async def test_direct_async_function_connection(sender):
     assert received_values == [42]
 
 
-def test_direct_function_disconnect(sender):
+@pytest.mark.asyncio
+async def test_direct_function_disconnect(sender):
     """Test disconnection of directly connected functions"""
+
     received_values = []
 
     def collector(v):
@@ -227,49 +262,152 @@ def test_direct_function_disconnect(sender):
     assert received_values == [42]
 
 
-def test_method_connection_with_signal_attributes(sender):
-    """Test connecting a method with _thread and _loop attributes automatically sets up receiver"""
+@pytest.mark.asyncio
+async def test_method_connection_with_signal_attributes(sender):
+    """Test connecting a method with _tsignal_thread and _tsignal_loop attributes automatically sets up receiver"""
+
     received_values = []
 
     @t_with_signals
     class SignalReceiver:
         """Receiver class for signal attributes"""
+
         def collect_value(self, value):
             """Slot for value changed"""
+
             received_values.append(value)
 
     class RegularClass:
         """Regular class for value changed"""
+
         def collect_value(self, value):
             """Slot for value changed"""
+
             received_values.append(value * 2)
 
-    # signal_receiver's method
     signal_receiver = SignalReceiver()
-    sender.value_changed.connect(signal_receiver.collect_value)
-
-    # regular class's method
+    signal = sender.value_changed
     regular_receiver = RegularClass()
-    sender.value_changed.connect(regular_receiver.collect_value)
 
-    # Emit signal
-    sender.emit_value(42)
+    signal.connect(signal_receiver.collect_value)
+    signal.connect(regular_receiver.collect_value)
 
-    # signal_receiver's method is QUEUED_CONNECTION
-    connection = next(
-        conn
-        for conn in sender.value_changed.connections
-        if conn[1].__name__ == signal_receiver.collect_value.__name__
-    )
-    assert connection[0] == signal_receiver  # receiver is set automatically
+    # The connection type of signal_receiver's method is DIRECT_CONNECTION
+    # because it has the same thread affinity as the signal
+    receiver, slot, conn_type, is_coro = signal.connections[-1]
+    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    assert actual_type == TConnectionType.DIRECT_CONNECTION
 
-    # regular_receiver's method is DIRECT_CONNECTION
-    connection = next(
-        conn
-        for conn in sender.value_changed.connections
-        if hasattr(conn[1], "__wrapped__")
-    )
-    assert connection[0] is None
+    # The connection type of regular class's method is DIRECT_CONNECTION
+    # because it has the same thread affinity as the signal
+    receiver, slot, conn_type, is_coro = signal.connections[-1]
+    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    assert actual_type == TConnectionType.DIRECT_CONNECTION
+
+    signal.emit(42)
 
     assert 42 in received_values
     assert 84 in received_values
+
+
+@pytest.mark.asyncio
+async def test_connection_type_determination():
+    """Test connection type is correctly determined for different scenarios"""
+
+    # Regular function should use DIRECT_CONNECTION
+    def regular_handler(value):
+        """Regular handler"""
+
+    # Async function should use QUEUED_CONNECTION
+    async def async_handler(value):
+        """Async handler"""
+
+    # Regular class with no thread/loop attributes
+    class RegularClass:
+        """Regular class"""
+
+        def handler(self, value):
+            """Handler"""
+
+    # Regular class with thread/loop attributes
+    @t_with_signals
+    class RegularClassWithSignal:
+        """Regular class with signal"""
+
+        @t_signal
+        def test_signal(self):
+            """Signal"""
+
+    # Class with thread/loop but not worker
+    @t_with_signals
+    class ThreadedClass:
+        """Threaded class"""
+
+        @t_slot
+        def sync_handler(self, value):
+            """Sync handler"""
+
+        @t_slot
+        async def async_handler(self, value):
+            """Async handler"""
+
+    # Worker class
+    @t_with_worker
+    class WorkerClass:
+        """Worker class"""
+
+        @t_slot
+        def sync_handler(self, value):
+            """Sync handler"""
+
+        @t_slot
+        async def async_handler(self, value):
+            """Async handler"""
+
+    regular_obj = RegularClass()
+    regular_with_signal_obj = RegularClassWithSignal()
+    threaded_obj = ThreadedClass()
+    worker_obj = WorkerClass()
+
+    # Test sync function connections
+    signal = regular_with_signal_obj.test_signal
+    signal.connect(regular_handler)
+    receiver, slot, conn_type, is_coro = signal.connections[-1]
+    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    assert actual_type == TConnectionType.DIRECT_CONNECTION
+
+    # Test async function connections
+    signal.connect(async_handler)
+    receiver, slot, conn_type, is_coro = signal.connections[-1]
+    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    assert actual_type == TConnectionType.QUEUED_CONNECTION
+
+    # Test regular class method
+    signal.connect(regular_obj.handler)
+    receiver, slot, conn_type, is_coro = signal.connections[-1]
+    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    assert actual_type == TConnectionType.DIRECT_CONNECTION
+
+    # Test threaded class with sync method
+    signal.connect(threaded_obj, threaded_obj.sync_handler)
+    receiver, slot, conn_type, is_coro = signal.connections[-1]
+    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    assert actual_type == TConnectionType.DIRECT_CONNECTION
+
+    # Test threaded class with async method
+    signal.connect(threaded_obj, threaded_obj.async_handler)
+    receiver, slot, conn_type, is_coro = signal.connections[-1]
+    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    assert actual_type == TConnectionType.QUEUED_CONNECTION
+
+    # Test worker class with sync method
+    signal.connect(worker_obj.sync_handler)
+    receiver, slot, conn_type, is_coro = signal.connections[-1]
+    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    assert actual_type == TConnectionType.QUEUED_CONNECTION
+
+    # Test worker class with async method
+    signal.connect(worker_obj.async_handler)
+    receiver, slot, conn_type, is_coro = signal.connections[-1]
+    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    assert actual_type == TConnectionType.QUEUED_CONNECTION

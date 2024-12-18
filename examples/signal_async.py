@@ -1,3 +1,5 @@
+# examples/02_signal_async.py
+
 """
 Async Signal Example
 
@@ -13,16 +15,20 @@ from tsignal import t_with_signals, t_signal, t_slot
 
 @t_with_signals
 class Counter:
+    """
+    A simple counter class that emits a signal when its count changes.
+    """
+
     def __init__(self):
         self.count = 0
-    
+
     @t_signal
     def count_changed(self):
         """Signal emitted when count changes"""
-        pass
-    
+
     def increment(self):
         """Increment counter and emit signal"""
+
         self.count += 1
         print(f"Counter incremented to: {self.count}")
         self.count_changed.emit(self.count)
@@ -30,9 +36,13 @@ class Counter:
 
 @t_with_signals
 class AsyncDisplay:
+    """
+    A simple display class that receives count updates and processes them asynchronously.
+    """
+
     def __init__(self):
         self.last_value = None
-    
+
     @t_slot
     async def on_count_changed(self, value):
         """Async slot that receives count updates"""
@@ -44,27 +54,31 @@ class AsyncDisplay:
 
 
 async def main():
+    """
+    Main function to run the async counter example.
+    """
+
     # Create instances
     counter = Counter()
     display = AsyncDisplay()
-    
+
     # Connect signal to async slot
     counter.count_changed.connect(display, display.on_count_changed)
-    
+
     print("Starting async counter example...")
     print("Press Enter to increment counter, or 'q' to quit")
     print("(Notice the 1 second delay in processing)")
-    
+
     while True:
         # Get input asynchronously
         line = await asyncio.get_event_loop().run_in_executor(None, input, "> ")
-        
-        if line.lower() == 'q':
+
+        if line.lower() == "q":
             break
-        
+
         # Increment counter which will emit signal
         counter.increment()
-        
+
         # Give some time for async processing to complete
         await asyncio.sleep(0.1)
 

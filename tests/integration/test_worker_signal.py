@@ -1,3 +1,5 @@
+# tests/integration/test_worker_signal.py
+
 """
 Test cases for the worker-signal pattern.
 """
@@ -11,21 +13,28 @@ import asyncio
 import logging
 import pytest
 from tsignal.contrib.patterns.worker.decorators import t_with_worker
-from tsignal import t_signal
+from tsignal import t_signal, TSignalConstants
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
+async def signal_worker_lifecycle():
+    """Create a signal worker for testing the lifecycle"""
+    logger.info("Creating SignalWorker")
+    w = SignalWorker()
+    yield w
+
+
+@pytest.fixture
 async def signal_worker():
-    """Create a signal worker"""
+    """Create a signal worker for testing the value changed signal"""
     logger.info("Creating SignalWorker")
     w = SignalWorker()
     yield w
     logger.info("Cleaning up SignalWorker")
-    if getattr(w, "_worker_thread", None) and w._worker_thread.is_alive():
+    if getattr(w, TSignalConstants.THREAD, None) and w._tsignal_thread.is_alive():
         w.stop()
-        w._worker_thread.join(timeout=1)
 
 
 @t_with_worker
@@ -37,66 +46,66 @@ class SignalWorker:
         super().__init__()
 
     @t_signal
+    def worker_event(self):
+        """Signal emitted when the worker event occurs"""
+
+    @t_signal
     def value_changed(self):
         """Signal emitted when the value changes"""
 
-    @t_signal
-    def worker_event(self):
-        """Signal emitted when a worker event occurs"""
-
-    async def initialize(self):
-        """Initialize the worker"""
-        logger.info("SignalWorker initializing")
-        self.value_changed.emit("initialized")
-
-    async def finalize(self):
-        """Finalize the worker"""
-        logger.info("SignalWorker finalizing")
-        self.value_changed.emit("finalized")
-
     def set_value(self, value):
         """Set the value and emit the signal"""
-        logger.info("Setting value to: %s", value)
+        logger.info("[SignalWorker][set_value]Setting value to: %s", value)
         self.value = value
         self.value_changed.emit(value)
 
 
 @pytest.mark.asyncio
-async def test_signal_from_initialize(signal_worker):
+async def test_signal_lifecycle(signal_worker_lifecycle):
     """Test if the signal emitted from initialize is processed correctly"""
     received = []
-    signal_worker.value_changed.connect(lambda v: received.append(v))
 
-    signal_worker.start()
+    async def on_started():
+        logger.info("[on_started]started")
+        received.append("started")
+        logger.info("[on_started]received: %s", received)
+
+    async def on_stopped():
+        logger.info("[on_stopped]stopped")
+        received.append("stopped")
+        logger.info("[on_stopped]received: %s", received)
+
+    signal_worker_lifecycle.started.connect(on_started)
+    signal_worker_lifecycle.stopped.connect(on_stopped)
+
+    signal_worker_lifecycle.start()
+    await asyncio.sleep(0.1)
+    signal_worker_lifecycle.stop()
     await asyncio.sleep(0.1)
 
-    assert "initialized" in received
+    logger.info("received: %s", received)
 
-
-@pytest.mark.asyncio
-async def test_signal_from_finalize(signal_worker):
-    """Test if the signal emitted from finalize is processed correctly"""
-    received = []
-    signal_worker.value_changed.connect(lambda v: received.append(v))
-
-    signal_worker.start()
-    await asyncio.sleep(0.1)
-    signal_worker.stop()
-
-    assert "finalized" in received
+    assert "started" in received
+    assert "stopped" in received
 
 
 @pytest.mark.asyncio
 async def test_signal_from_worker_thread(signal_worker):
     """Test if the signal emitted from the worker thread is processed correctly"""
     received = []
-    signal_worker.value_changed.connect(lambda v: received.append(v))
+
+    async def on_value_changed(value):
+        """Callback for the value changed signal"""
+        logger.info("[on_value_changed]Received value: %s", value)
+        received.append(value)
+
+    signal_worker.value_changed.connect(on_value_changed)
 
     signal_worker.start()
     await asyncio.sleep(0.1)
 
     # Emit signal from the worker thread's event loop
-    signal_worker._worker_loop.call_soon_threadsafe(
+    signal_worker.event_loop.call_soon_threadsafe(
         lambda: signal_worker.set_value("test_value")
     )
 
@@ -117,12 +126,12 @@ async def test_multiple_signals(signal_worker):
     await asyncio.sleep(0.1)
 
     # Emit value_changed signal
-    signal_worker._worker_loop.call_soon_threadsafe(
+    signal_worker.event_loop.call_soon_threadsafe(
         lambda: signal_worker.set_value("test_value")
     )
 
     # Emit worker_event signal
-    signal_worker._worker_loop.call_soon_threadsafe(
+    signal_worker.event_loop.call_soon_threadsafe(
         lambda: signal_worker.worker_event.emit("worker_event")
     )
 
@@ -143,13 +152,18 @@ async def test_signal_disconnect(signal_worker):
     signal_worker.start()
     await asyncio.sleep(0.1)
 
-    assert "initialized" in received
+    signal_worker.event_loop.call_soon_threadsafe(
+        lambda: signal_worker.set_value("test_value")
+    )
+    await asyncio.sleep(0.1)
+
+    assert "test_value" in received
     received.clear()
 
     # Disconnect signal
     signal_worker.value_changed.disconnect(slot=handler)
 
-    signal_worker._worker_loop.call_soon_threadsafe(
+    signal_worker._tsignal_loop.call_soon_threadsafe(
         lambda: signal_worker.set_value("after_disconnect")
     )
 
