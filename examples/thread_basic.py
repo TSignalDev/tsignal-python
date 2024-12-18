@@ -1,4 +1,4 @@
-# examples/03_thread_basic.py
+# examples/thread_basic.py
 
 """
 Thread Communication Example

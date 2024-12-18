@@ -1,4 +1,4 @@
-# examples/06_stock_monitor_console.py
+# examples/stock_monitor_console.py
 
 """
 Stock monitor console example.

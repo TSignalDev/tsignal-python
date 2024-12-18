@@ -1,4 +1,4 @@
-# examples/04_thread_worker.py
+# examples/thread_worker.py
 
 """
 Thread Worker Pattern Example

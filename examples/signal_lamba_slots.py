@@ -1,0 +1,52 @@
+# examples/signal_lambda_slots.py
+
+"""
+Signal-Lambda Slots Example
+
+This example demonstrates connecting a signal to a lambda function slot.
+It shows that you can quickly define inline, anonymous slots for simple tasks.
+
+Steps:
+1. Define a signal in a class (Counter) that emits when its count changes.
+2. Connect the signal to a lambda function that prints the received value.
+3. Increment the counter and observe the lambda being called.
+
+Key Points:
+- Demonstrates that slots can be lambdas (anonymous functions).
+- Useful for quick, inline actions without defining a separate function or method.
+"""
+
+import asyncio
+from tsignal.core import t_with_signals, t_signal
+
+
+@t_with_signals
+class Counter:
+    def __init__(self):
+        self.count = 0
+
+    @t_signal
+    def count_changed(self):
+        """Emitted when the count changes."""
+
+    def increment(self):
+        self.count += 1
+        print(f"Counter incremented to: {self.count}")
+        self.count_changed.emit(self.count)
+
+
+async def main():
+    counter = Counter()
+    # Connect the signal to a lambda slot
+    counter.count_changed.connect(lambda v: print(f"Lambda Slot received: {v}"))
+
+    print("Press Enter to increment counter, or 'q' to quit.")
+    while True:
+        line = input("> ")
+        if line.lower() == "q":
+            break
+        counter.increment()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

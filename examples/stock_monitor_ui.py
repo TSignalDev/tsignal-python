@@ -1,4 +1,4 @@
-# examples/07_stock_monitor_ui.py
+# examples/stock_monitor_ui.py
 
 """
 Stock monitor UI example.

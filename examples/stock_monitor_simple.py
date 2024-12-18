@@ -1,4 +1,4 @@
-# examples/05_stock_monitor_simple_updated.py
+# examples/stock_monitor_simple.py
 
 """
 Stock monitor simple example.

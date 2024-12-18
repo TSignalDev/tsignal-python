@@ -1,4 +1,4 @@
-# examples/02_signal_async.py
+# examples/signal_async.py
 
 """
 Async Signal Example
@@ -7,6 +7,12 @@ This example demonstrates the basic usage of TSignal with async slots:
 1. Creating a signal
 2. Connecting an async slot
 3. Emitting a signal to async handler
+
+Key Points:
+- Demonstrates asynchronous signal-slot communication
+- Shows how to use @t_slot decorator with async functions
+- Illustrates handling of async slot execution in event loop
+- Explains integration of signals with asyncio for non-blocking operations
 """
 
 import asyncio

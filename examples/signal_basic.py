@@ -1,15 +1,22 @@
-# examples/01_signal_basic.py
+# examples/signal_basic.py
 
 """
-Async Signal Example
+Basic Signal-Slot Example
 
-This example demonstrates the basic usage of TSignal with async slots:
+This example demonstrates the fundamental usage of TSignal with a synchronous slot:
 1. Creating a signal
-2. Connecting an async slot
-3. Emitting a signal to async handler
+2. Connecting a regular method as a slot (without @t_slot)
+3. Emitting a signal to trigger slot execution
+
+Key Points:
+- Showcases the most basic form of signal-slot connection.
+- The slot is a normal instance method of a class, not decorated with @t_slot.
+- Emphasizes that even without @t_slot, a callable method can act as a slot.
+- Introduces the concept of signal emission and immediate slot execution.
 """
 
 import asyncio
+import time
 from tsignal.core import t_with_signals, t_signal, t_slot
 
 
@@ -34,20 +41,19 @@ class Counter:
 
 
 @t_with_signals
-class AsyncDisplay:
+class Display:
     """
-    A simple display class that receives count updates and processes them asynchronously.
+    A simple display class that receives count updates and processes them.
     """
 
     def __init__(self):
         self.last_value = None
 
-    @t_slot
-    async def on_count_changed(self, value):
-        """Async slot that receives count updates"""
+    def on_count_changed(self, value):
+        """slot that receives count updates"""
         print(f"Display processing count: {value}")
-        # Simulate some async processing
-        await asyncio.sleep(1)
+        # Simulate some heavy processing
+        time.sleep(1)
         self.last_value = value
         print(f"Display finished processing: {value}")
 
@@ -59,27 +65,23 @@ async def main():
 
     # Create instances
     counter = Counter()
-    display = AsyncDisplay()
+    display = Display()
 
-    # Connect signal to async slot
-    counter.count_changed.connect(display, display.on_count_changed)
+    # Connect signal to slot
+    counter.count_changed.connect(display.on_count_changed)
 
-    print("Starting async counter example...")
+    print("Starting counter example...")
     print("Press Enter to increment counter, or 'q' to quit")
     print("(Notice the 1 second delay in processing)")
 
     while True:
-        # Get input asynchronously
-        line = await asyncio.get_event_loop().run_in_executor(None, input, "> ")
+        line = input("> ")
 
         if line.lower() == "q":
             break
 
         # Increment counter which will emit signal
         counter.increment()
-
-        # Give some time for async processing to complete
-        await asyncio.sleep(0.1)
 
 
 if __name__ == "__main__":
