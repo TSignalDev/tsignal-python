@@ -10,13 +10,18 @@ tests/
 ├── conftest.py          # Shared fixtures and configurations
 ├── unit/               # Unit tests
 │   ├── __init__.py
+│   ├── test_property.py
 │   ├── test_signal.py
 │   ├── test_slot.py
-│   └── test_with_signals.py
+│   └── test_utils.py
 ├── integration/        # Integration tests
 │   ├── __init__.py
 │   ├── test_async.py
-│   └── test_threading.py
+│   ├── test_threading.py
+│   ├── test_with_signals.py
+│   ├── test_worker_signal.py
+│   ├── test_worker_queue.py
+│   └── test_worker.py
 └── performance/        # Performance and stress tests
     ├── __init__.py
     ├── test_stress.py
