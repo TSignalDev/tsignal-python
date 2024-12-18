@@ -1,3 +1,5 @@
+# tests/unit/test_slot.py
+
 """
 Test cases for the slot pattern.
 """
@@ -14,8 +16,10 @@ from tsignal import t_with_signals, t_slot
 logger = logging.getLogger(__name__)
 
 
-def test_sync_slot(sender, receiver):
+@pytest.mark.asyncio
+async def test_sync_slot(sender, receiver):
     """Test synchronous slot execution"""
+
     sender.value_changed.connect(receiver, receiver.on_value_changed_sync)
     sender.emit_value(42)
     assert receiver.received_value == 42
@@ -25,6 +29,7 @@ def test_sync_slot(sender, receiver):
 @pytest.mark.asyncio
 async def test_directly_call_slot(receiver):
     """Test direct slot calls"""
+
     await receiver.on_value_changed(42)
     assert receiver.received_value == 42
     assert receiver.received_count == 1
@@ -34,7 +39,8 @@ async def test_directly_call_slot(receiver):
     assert receiver.received_count == 2
 
 
-def test_slot_exception(sender, receiver, event_loop):
+@pytest.mark.asyncio
+async def test_slot_exception(sender, receiver):
     """Test exception handling in slots"""
 
     @t_with_signals
@@ -52,13 +58,10 @@ def test_slot_exception(sender, receiver, event_loop):
     )
     sender.value_changed.connect(receiver, receiver.on_value_changed)
 
-    async def test():
-        sender.emit_value(42)
-        await asyncio.sleep(0.1)
-        assert receiver.received_value == 42
-        assert receiver.received_count == 1
-
-    event_loop.run_until_complete(test())
+    sender.emit_value(42)
+    await asyncio.sleep(0.1)
+    assert receiver.received_value == 42
+    assert receiver.received_count == 1
 
 
 @pytest.mark.asyncio
@@ -104,7 +107,7 @@ async def test_slot_thread_safety():
             initial_values["count"] = receiver.received_count
 
             coro = receiver.async_slot(42)
-            future = asyncio.run_coroutine_threadsafe(coro, receiver._loop)
+            future = asyncio.run_coroutine_threadsafe(coro, receiver._tsignal_loop)
             # Wait for async_slot result
             future.result()
 
@@ -138,7 +141,7 @@ async def test_slot_thread_safety():
         thread.join()
 
         # Cleanup
-        pending = asyncio.all_tasks(receiver._loop)
+        pending = asyncio.all_tasks(receiver._tsignal_loop)
         if pending:
             logger.debug("Cleaning up %d pending tasks", len(pending))
             for task in pending:

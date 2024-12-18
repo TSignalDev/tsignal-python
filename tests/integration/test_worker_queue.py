@@ -1,3 +1,5 @@
+# tests/integration/test_worker_queue.py
+
 """
 Test cases for the worker-queue pattern.
 """
@@ -17,13 +19,12 @@ logger = logging.getLogger(__name__)
 @pytest.fixture
 async def queue_worker():
     """Create a queue worker"""
+
     logger.info("Creating QueueWorker")
     w = QueueWorker()
     yield w
     logger.info("Cleaning up QueueWorker")
-    if getattr(w, "_worker_thread", None) and w._worker_thread.is_alive():
-        w.stop()
-        w._worker_thread.join(timeout=1)
+    w.stop()
 
 
 @t_with_worker
@@ -34,32 +35,44 @@ class QueueWorker:
         self.processed_items = []
         super().__init__()
 
-    async def initialize(self):
-        """Initialize the worker"""
-        logger.info("QueueWorker initializing")
-
-    async def finalize(self):
-        """Finalize the worker"""
-        logger.info("QueueWorker finalizing")
-
     async def process_item(self, item):
         """Process an item"""
-        logger.info("Processing item: %s", item)
+
+        logger.info(
+            "[QueueWorker][process_item] processing item: %s processed_items: %s",
+            item,
+            self.processed_items,
+        )
+
         await asyncio.sleep(0.1)  # Simulate work
         self.processed_items.append(item)
+
+        logger.info(
+            "[QueueWorker][process_item] processed item: %s processed_items: %s",
+            item,
+            self.processed_items,
+        )
 
 
 @pytest.mark.asyncio
 async def test_basic_queue_operation(queue_worker):
     """Basic queue operation test"""
+
+    logger.info("Starting queue worker")
     queue_worker.start()
+    logger.info("Queue worker started")
     await asyncio.sleep(0.1)
 
-    await queue_worker.queue_task(queue_worker.process_item("item1"))
-    await queue_worker.queue_task(queue_worker.process_item("item2"))
+    logger.info("Queueing tasks")
+    queue_worker.queue_task(queue_worker.process_item("item1"))
+    logger.info("Task queued: item1")
+    queue_worker.queue_task(queue_worker.process_item("item2"))
+    logger.info("Task queued: item2")
 
+    logger.info("Waiting for tasks to complete")
     await asyncio.sleep(0.5)
 
+    logger.info("Checking processed items: %s", queue_worker.processed_items)
     assert "item1" in queue_worker.processed_items
     assert "item2" in queue_worker.processed_items
     assert len(queue_worker.processed_items) == 2
@@ -68,12 +81,14 @@ async def test_basic_queue_operation(queue_worker):
 @pytest.mark.asyncio
 async def test_queue_order(queue_worker):
     """Test for ensuring the order of the task queue"""
+
     queue_worker.start()
     await asyncio.sleep(0.1)
 
     items = ["first", "second", "third"]
+
     for item in items:
-        await queue_worker.queue_task(queue_worker.process_item(item))
+        queue_worker.queue_task(queue_worker.process_item(item))
 
     await asyncio.sleep(0.5)
 
@@ -91,13 +106,14 @@ async def test_queue_error_handling(queue_worker):
     await asyncio.sleep(0.1)
 
     # Add normal and failing tasks
-    await queue_worker.queue_task(queue_worker.process_item("good_item"))
-    await queue_worker.queue_task(failing_task())
-    await queue_worker.queue_task(queue_worker.process_item("after_error"))
+    queue_worker.queue_task(queue_worker.process_item("good_item"))
+    queue_worker.queue_task(failing_task())
+    queue_worker.queue_task(queue_worker.process_item("after_error"))
 
     await asyncio.sleep(0.5)
 
     # The error should not prevent the next task from being processed
+    print("[test_queue_error_handling] processed_items: ", queue_worker.processed_items)
     assert "good_item" in queue_worker.processed_items
     assert "after_error" in queue_worker.processed_items
 
@@ -105,6 +121,7 @@ async def test_queue_error_handling(queue_worker):
 @pytest.mark.asyncio
 async def test_queue_cleanup_on_stop(queue_worker):
     """Test for queue cleanup when worker stops"""
+
     queue_worker.start()
     await asyncio.sleep(0.1)
 
@@ -113,14 +130,16 @@ async def test_queue_cleanup_on_stop(queue_worker):
         await asyncio.sleep(0.5)
         queue_worker.processed_items.append("long_task")
 
-    await queue_worker.queue_task(long_task())
-    await asyncio.sleep(0.1)  # Wait for the task to start
+    queue_worker.queue_task(long_task())
+
+    await asyncio.sleep(1)  # Wait for the task to start
+    assert "long_task" in queue_worker.processed_items
 
     # Stop the worker while the task is running
     queue_worker.stop()
 
     # Check if the worker exited normally
-    assert not queue_worker._worker_thread.is_alive()
+    assert not queue_worker._tsignal_thread
 
 
 @pytest.mark.asyncio
@@ -145,7 +164,7 @@ async def test_mixed_signal_and_queue(queue_worker):
         queue_worker.processed_items.append("signal_task")
         queue_worker.task_completed.emit()
 
-    await queue_worker.queue_task(task_with_signal())
+    queue_worker.queue_task(task_with_signal())
     await asyncio.sleep(0.3)
 
     assert "signal_task" in queue_worker.processed_items

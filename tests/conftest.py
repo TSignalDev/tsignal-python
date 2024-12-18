@@ -1,3 +1,5 @@
+# tests/conftest.py
+
 """
 Shared fixtures for tests.
 """
@@ -14,25 +16,11 @@ import asyncio
 import threading
 import logging
 import pytest
+import pytest_asyncio
 from tsignal import t_with_signals, t_signal, t_slot
 
 # Only creating the logger without configuration
 logger = logging.getLogger(__name__)
-
-
-def log_debug(message):
-    """Log a debug message if DEBUG level is enabled."""
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(message)
-
-
-@pytest.fixture(scope="function")
-def event_loop():
-    """Create an event loop"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
 
 
 @t_with_signals
@@ -54,6 +42,9 @@ class Receiver:
 
     def __init__(self):
         super().__init__()
+
+        logger.debug("[Receiver][__init__] self=%s", self)
+
         self.received_value = None
         self.received_count = 0
         self.id = id(self)
@@ -92,15 +83,17 @@ class Receiver:
         )
 
 
-@pytest.fixture
-def receiver(event_loop):
+@pytest_asyncio.fixture
+async def receiver():
     """Create a receiver"""
+    logger.info("Creating receiver. event loop: %s", asyncio.get_running_loop())
     return Receiver()
 
 
-@pytest.fixture
-def sender(event_loop):
+@pytest_asyncio.fixture
+async def sender():
     """Create a sender"""
+    logger.info("Creating receiver. event loop: %s", asyncio.get_running_loop())
     return Sender()
 
 
@@ -112,6 +105,7 @@ def setup_logging():
 
     # Setting to WARNING level by default
     default_level = logging.WARNING
+    # default_level = logging.DEBUG
 
     # Can enable DEBUG mode via environment variable
 

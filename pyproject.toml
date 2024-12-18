@@ -63,6 +63,7 @@ disable = [
     "too-many-statements",
     "broad-exception-caught"
 ]
+max-line-length = 140
 
 [tool.coverage.report]
 exclude_lines = [
@@ -89,6 +90,8 @@ disable_error_code = ["annotation-unchecked", "assignment"]
 warn_return_any = false
 warn_unused_configs = false
 
-exclude = "tests/|setup.py"
-
 ignore_errors = true
+omit = [
+    "tests/*",
+    "setup.py",
+]

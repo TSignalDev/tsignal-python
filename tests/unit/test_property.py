@@ -1,3 +1,5 @@
+# tests/unit/test_property.py
+
 """
 Test cases for the property pattern.
 """
@@ -58,8 +60,10 @@ class ReadOnlyTemperature:
         return self._celsius
 
 
-def test_property_basic():
+@pytest.mark.asyncio
+async def test_property_basic():
     """Test basic property get/set operations"""
+
     temp = Temperature()
     assert temp.celsius == -273
 
@@ -68,8 +72,10 @@ def test_property_basic():
     assert temp.celsius == 25
 
 
-def test_property_notification():
+@pytest.mark.asyncio
+async def test_property_notification():
     """Test property change notifications"""
+
     temp = Temperature()
     received_values = []
 
@@ -98,8 +104,10 @@ def test_property_notification():
     assert received_values == [30, 15, 45]
 
 
-def test_property_read_only():
+@pytest.mark.asyncio
+async def test_property_read_only():
     """Test read-only property behavior"""
+
     temp = ReadOnlyTemperature()
 
     with pytest.raises(AttributeError, match="can't set attribute"):
@@ -109,6 +117,7 @@ def test_property_read_only():
 @pytest.mark.asyncio
 async def test_property_thread_safety():
     """Test property thread safety and notifications across threads"""
+
     temp = Temperature()
     received_values = []
     task_completed = asyncio.Event()
@@ -146,6 +155,7 @@ async def test_property_thread_safety():
 @pytest.mark.asyncio
 async def test_property_multiple_threads():
     """Test property behavior with multiple threads"""
+
     temp = Temperature()
     received_values = []
     values_lock = threading.Lock()
@@ -157,6 +167,7 @@ async def test_property_multiple_threads():
 
     def on_celsius_changed(value):
         """Handler for celsius change"""
+
         with values_lock:
             received_values.append(value)
 
@@ -164,6 +175,7 @@ async def test_property_multiple_threads():
 
     def background_task(value):
         """Background task for thread safety testing"""
+
         nonlocal threads_done
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -215,8 +227,10 @@ async def test_property_multiple_threads():
     # )
 
 
-def test_property_exception_handling():
+@pytest.mark.asyncio
+async def test_property_exception_handling():
     """Test property behavior with exceptions in signal handlers"""
+
     temp = Temperature()
     received_values = []
 

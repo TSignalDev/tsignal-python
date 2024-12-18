@@ -1,3 +1,5 @@
+# examples/04_thread_worker.py
+
 """
 Thread Worker Pattern Example
 
@@ -20,8 +22,10 @@ Architecture:
 - Signal/Slot connections handle thread-safe communication
 """
 
+# pylint: disable=no-member
+# pylint: disable=unused-argument
+
 import asyncio
-import time
 from tsignal import t_with_signals, t_signal, t_slot, t_with_worker
 
 
@@ -29,32 +33,29 @@ from tsignal import t_with_signals, t_signal, t_slot, t_with_worker
 class ImageProcessor:
     """Worker that processes images in background thread"""
 
-    def __init__(self):
+    def __init__(self, cache_size=100):
+        self.cache_size = cache_size
         self.cache = {}
         super().__init__()
+        self.stopped.connect(self, self.on_stopped)
 
-    async def initialize(self, cache_size=100):
-        """Initialize worker (runs in worker thread)"""
-        print(f"[Worker Thread] Initializing image processor (cache_size={cache_size})")
-        self.cache_size = cache_size
-
-    async def finalize(self):
+    async def on_stopped(self):
         """Cleanup worker (runs in worker thread)"""
+
         print("[Worker Thread] Cleaning up image processor")
         self.cache.clear()
 
     @t_signal
     def processing_complete(self):
         """Signal emitted when image processing completes"""
-        pass
 
     @t_signal
     def batch_complete(self):
         """Signal emitted when batch processing completes"""
-        pass
 
     async def process_image(self, image_id: str, image_data: bytes):
         """Process single image (runs in worker thread)"""
+
         print(f"[Worker Thread] Processing image {image_id}")
 
         # Simulate image processing
@@ -72,11 +73,15 @@ class ImageProcessor:
 
     async def process_batch(self, images: list):
         """Process batch of images (runs in worker thread)"""
+
         results = []
+
         for img_id, img_data in images:
             result = await self.process_image(img_id, img_data)
             results.append(result)
+
         self.batch_complete.emit(results)
+
         return results
 
 
@@ -101,6 +106,8 @@ class ImageViewer:
 
 
 async def main():
+    """Main function to run the example"""
+
     # Create components
     processor = ImageProcessor()
     viewer = ImageViewer()
@@ -118,12 +125,12 @@ async def main():
     for i in range(3):
         image_id = f"img_{i}"
         image_data = b"fake_image_data"
-        await processor.queue_task(processor.process_image(image_id, image_data))
+        processor.queue_task(processor.process_image(image_id, image_data))
 
     # Simulate batch processing
     print("\n=== Processing batch ===\n")
     batch = [(f"batch_img_{i}", b"fake_batch_data") for i in range(3)]
-    await processor.queue_task(processor.process_batch(batch))
+    processor.queue_task(processor.process_batch(batch))
 
     # Wait for processing to complete
     await asyncio.sleep(3)

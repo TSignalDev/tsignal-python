@@ -1,3 +1,5 @@
+# examples/01_signal_basic.py
+
 """
 Async Signal Example
 
@@ -13,13 +15,16 @@ from tsignal.core import t_with_signals, t_signal, t_slot
 
 @t_with_signals
 class Counter:
+    """
+    A simple counter class that emits a signal when its count changes.
+    """
+
     def __init__(self):
         self.count = 0
 
     @t_signal
     def count_changed(self):
         """Signal emitted when count changes"""
-        pass
 
     def increment(self):
         """Increment counter and emit signal"""
@@ -30,6 +35,10 @@ class Counter:
 
 @t_with_signals
 class AsyncDisplay:
+    """
+    A simple display class that receives count updates and processes them asynchronously.
+    """
+
     def __init__(self):
         self.last_value = None
 
@@ -44,6 +53,10 @@ class AsyncDisplay:
 
 
 async def main():
+    """
+    Main function to run the async counter example.
+    """
+
     # Create instances
     counter = Counter()
     display = AsyncDisplay()
