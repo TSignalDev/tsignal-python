@@ -33,11 +33,6 @@ def t_with_worker(cls):
     class WorkerClass(cls):
         """
         Worker class for the worker pattern.
-
-        _worker_lock:
-            A re-entrant lock that protects access to both the event loop (`_tsignal_loop`)
-            and the worker thread (`_tsignal_thread`). All operations that set or get
-            `_tsignal_loop` or `_tsignal_thread` must be done within `with self._worker_lock:`.
         """
 
         def __init__(self):
@@ -45,7 +40,7 @@ def t_with_worker(cls):
             self._tsignal_thread = None
 
             """
-            _lifecycle_lock:
+            _tsignal_lifecycle_lock:
                 A re-entrant lock that protects worker's lifecycle state (event loop and thread).
                 All operations that access or modify worker's lifecycle state must be
                 performed while holding this lock.

@@ -41,18 +41,18 @@ class StockService:
 
         self.prices: Dict[str, float] = {
             "AAPL": 180.0,  # Apple Inc.
-            # "GOOGL": 140.0,  # Alphabet Inc.
-            # "MSFT": 370.0,  # Microsoft Corporation
-            # "AMZN": 145.0,  # Amazon.com Inc.
-            # "TSLA": 240.0,  # Tesla Inc.
+            "GOOGL": 140.0,  # Alphabet Inc.
+            "MSFT": 370.0,  # Microsoft Corporation
+            "AMZN": 145.0,  # Amazon.com Inc.
+            "TSLA": 240.0,  # Tesla Inc.
         }
         self._desc_lock = threading.RLock()
         self._descriptions = {
             "AAPL": "Apple Inc.",
-            # "GOOGL": "Alphabet Inc.",
-            # "MSFT": "Microsoft Corporation",
-            # "AMZN": "Amazon.com Inc.",
-            # "TSLA": "Tesla Inc.",
+            "GOOGL": "Alphabet Inc.",
+            "MSFT": "Microsoft Corporation",
+            "AMZN": "Amazon.com Inc.",
+            "TSLA": "Tesla Inc.",
         }
         self.last_prices = self.prices.copy()
         self._running = False
@@ -83,8 +83,10 @@ class StockService:
 
         logger.info("[StockService][on_stopped] stopped")
         self._running = False
+
         if hasattr(self, "_update_task"):
             self._update_task.cancel()
+
             try:
                 await self._update_task
             except asyncio.CancelledError:
@@ -104,6 +106,7 @@ class StockService:
                     change=((self.prices[code] / self.last_prices[code]) - 1) * 100,
                     timestamp=time.time(),
                 )
+
                 logger.debug(
                     "[StockService][update_prices] price_data: %s",
                     price_data,
@@ -148,6 +151,7 @@ class StockViewModel:
     @t_slot
     def on_price_processed(self, price_data: StockPrice):
         """Receive processed stock price data from StockProcessor"""
+
         logger.debug("[StockViewModel][on_price_processed] price_data: %s", price_data)
         self.current_prices[price_data.code] = price_data
         self.prices_updated.emit(dict(self.current_prices))
@@ -155,6 +159,7 @@ class StockViewModel:
     @t_slot
     def on_alert_triggered(self, code: str, alert_type: str, price: float):
         """Receive alert trigger from StockProcessor"""
+
         self.alerts.append((code, alert_type, price))
         self.alert_added.emit(code, alert_type, price)
 
@@ -163,6 +168,7 @@ class StockViewModel:
         self, code: str, lower: Optional[float], upper: Optional[float]
     ):
         """Receive alert settings change notification from StockProcessor"""
+
         if lower is None and upper is None:
             self.alert_settings.pop(code, None)
         else:
@@ -209,12 +215,14 @@ class StockProcessor:
         self, code: str, lower: Optional[float], upper: Optional[float]
     ):
         """Receive price alert setting request from main thread"""
+
         self.price_alerts[code] = (lower, upper)
         self.alert_settings_changed.emit(code, lower, upper)
 
     @t_slot
     async def on_remove_price_alert(self, code: str):
         """Receive price alert removal request from main thread"""
+
         if code in self.price_alerts:
             del self.price_alerts[code]
             self.alert_settings_changed.emit(code, None, None)
@@ -222,6 +230,7 @@ class StockProcessor:
     @t_slot
     async def on_price_updated(self, price_data: StockPrice):
         """Receive stock price update from StockService"""
+
         logger.debug("[StockProcessor][on_price_updated] price_data: %s", price_data)
 
         try:
@@ -232,17 +241,22 @@ class StockProcessor:
 
     async def process_price(self, price_data: StockPrice):
         """Process stock price data"""
+
         logger.debug("[StockProcessor][process_price] price_data: %s", price_data)
+
         try:
             if price_data.code in self.price_alerts:
                 logger.debug(
                     "[process_price] Process price event loop: %s",
                     asyncio.get_running_loop(),
                 )
+
             if price_data.code in self.price_alerts:
                 lower, upper = self.price_alerts[price_data.code]
+
                 if lower and price_data.price <= lower:
                     self.alert_triggered.emit(price_data.code, "LOW", price_data.price)
+
                 if upper and price_data.price >= upper:
                     self.alert_triggered.emit(price_data.code, "HIGH", price_data.price)
 

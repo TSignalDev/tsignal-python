@@ -4,7 +4,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2024-03-19
+## [0.3.0] - 2024-12-19
+
+### Changed
+- Removed `initialize` and `finalize` methods from the worker thread.
+
+### Added
+- Added the following examples:
+  - `signal_function_slots.py` for demonstrating signal/slot connection with a regular function
+  - `signal_lambda_slots.py` for demonstrating signal/slot connection with a lambda function
+  - `stock_core.py` for demonstrating how to configure and communicate with a threaded backend using signal/slot and event queue
+  - `stock_monitor_console.py` for demonstrating how to configure and communicate with a threaded backend in a command line interface
+  - `stock_monitor_ui.py` for demonstrating how to configure and communicate with a threaded backend in a GUI.
+
+### Fixed
+- Fixed issues with regular function and lambda function connections.
+- Fixed issues with the worker thread's event queue and graceful shutdown.
+
+### Note
+Next steps before 1.0.0:
+- Strengthening Stability
+  - Resource Cleanup Mechanism/Weak Reference Support:
+    - Consider supporting weak references (weakref) that automatically release signal/slot connections when the object is GC'd.
+  - Handling Slot Return Values in Async/Await Flow:
+    - A mechanism may be needed to handle the values or exceptions returned by async slots.
+      Example: If a slot call fails, the emit side can detect and return a callback or future.
+  - Strengthening Type Hint-Based Verification:
+    - The functionality of comparing the slot signature and the type of the passed argument when emitting can be further extended.
+      - Read the type hint for the slot function, and if the number or type of the arguments does not match when emitting, raise a warning or exception.
+- Consider Additional Features
+  - One-shot or Limited Connection Functionality:
+      A "one-shot" slot feature that listens to a specific event only once and then disconnects can be provided.
+        Example: Add the connect_one_shot method.
+        Once the event is received, it will automatically disconnect.
+
+## [0.2.0] - 2024-12-6
 
 ### Changed
 - Updated minimum Python version requirement to 3.10

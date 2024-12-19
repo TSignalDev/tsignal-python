@@ -68,13 +68,16 @@ class StockMonitorCLI:
             print("\n(Press Enter to return to menu)")
 
             alerts = []
+
             for code, data in prices.items():
                 if code in self.view_model.alert_settings:
                     lower, upper = self.view_model.alert_settings[code]
+
                     if lower and data.price <= lower:
                         alerts.append(
                             f"{code} price (${data.price:.2f}) below ${lower:.2f}"
                         )
+
                     if upper and data.price >= upper:
                         alerts.append(
                             f"{code} price (${data.price:.2f}) above ${upper:.2f}"
@@ -82,11 +85,13 @@ class StockMonitorCLI:
 
             if alerts:
                 print("\nAlerts:")
+
                 for alert in alerts:
                     print(alert)
 
     async def process_command(self, command: str):
         """Process command"""
+
         parts = command.strip().split()
 
         if not parts:
@@ -123,6 +128,7 @@ class StockMonitorCLI:
 
         elif parts[0] == "remove" and len(parts) == 2:
             code = parts[1].upper()
+
             if code in self.view_model.alert_settings:
                 self.view_model.remove_alert.emit(code)
                 print(f"Alert removed for {code}")
@@ -140,6 +146,7 @@ class StockMonitorCLI:
 
     async def run(self):
         """CLI execution"""
+
         logger.debug(
             "[StockMonitorCLI][run] started current loop: %s %s",
             id(asyncio.get_running_loop()),
@@ -152,11 +159,15 @@ class StockMonitorCLI:
 
         # Connect service.start to processor's started signal
         def on_processor_started():
+            """Processor started"""
+
             logger.debug("[StockMonitorCLI][run] processor started, starting service")
             self.service.start()
 
             # Set processor_started future to True in the main loop
             def set_processor_started_true():
+                """Set processor started"""
+
                 logger.debug(
                     "[StockMonitorCLI][run] set_processor_started_true current loop: %s %s",
                     id(asyncio.get_running_loop()),

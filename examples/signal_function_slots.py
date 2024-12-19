@@ -23,6 +23,8 @@ from tsignal.core import t_with_signals, t_signal
 
 @t_with_signals
 class Counter:
+    """A simple counter class that emits a signal when its count changes."""
+
     def __init__(self):
         self.count = 0
 
@@ -31,6 +33,8 @@ class Counter:
         """Emitted when the count changes."""
 
     def increment(self):
+        """Increment the counter and emit the signal."""
+
         self.count += 1
         print(f"Counter incremented to: {self.count}")
         self.count_changed.emit(self.count)
@@ -38,17 +42,22 @@ class Counter:
 
 def print_value(value):
     """A standalone function acting as a slot."""
+
     print(f"Function Slot received value: {value}")
 
 
 async def main():
+    """Main function to run the signal-function slots example."""
+
     counter = Counter()
     # Connect the signal to the standalone function slot
     counter.count_changed.connect(print_value)
 
     print("Press Enter to increment counter, or 'q' to quit.")
+
     while True:
         line = input("> ")
+
         if line.lower() == "q":
             break
         counter.increment()

@@ -41,8 +41,10 @@ class DataWorker:
         await self._tsignal_stopping.wait()
         # Clean up
         self._running = False
+
         if self._update_task:
             self._update_task.cancel()
+
             try:
                 await self._update_task
             except asyncio.CancelledError:
@@ -52,10 +54,13 @@ class DataWorker:
         """Update loop"""
 
         count = 0
+
         while self._running:
             logger.debug("[Worker] Processing data %d", count)
             self.data_processed.emit(count)
+
             count += 1
+
             await asyncio.sleep(1)
 
 

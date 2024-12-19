@@ -106,6 +106,7 @@ class StockView(BoxLayout):
     @t_slot
     def on_alert_added(self, code: str, alert_type: str, price: float):
         """Update UI when alert is triggered"""
+
         self.alert_label.text = f"ALERT: {code} {alert_type} {price:.2f}"
 
 
@@ -201,6 +202,7 @@ class AsyncKivyApp(App):
         """Alert removal button handler"""
 
         code = self.view.stock_spinner.text
+
         if not code:
             self.view.alert_label.text = "No stock selected"
             return
@@ -230,6 +232,7 @@ class AsyncKivyApp(App):
         for task in self.tasks:
             if not task.done():
                 task.cancel()
+
                 try:
                     await task
                 except asyncio.CancelledError:
@@ -240,6 +243,7 @@ class AsyncKivyApp(App):
         """Async run"""
 
         self._async_lib = async_lib or asyncio
+
         return await self._async_lib.gather(
             self._async_lib.create_task(super().async_run(async_lib=async_lib))
         )
@@ -262,6 +266,7 @@ async def main():
         for task in app.tasks:
             if not task.done():
                 task.cancel()
+
                 try:
                     await task
                 except asyncio.CancelledError:
