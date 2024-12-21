@@ -405,6 +405,12 @@ This is a stepping stone to more complex stock monitoring examples.
   - `StockService`: Generates stock price updates in a worker thread
   - `StockProcessor`: Processes updates, applies alerts, and emits results
   - `StockViewModel`: Maintains state for the UI (in this case, a console UI)
+  
+**Screenshot:**
+<div align="center">
+  <img src="https://raw.githubusercontent.com/TSignalDev/tsignal-python/refs/heads/main/docs/images/stock_monitor_console.png" alt="Stock Monitor Console" width="800"/>
+  <p><em>Stock Monitor Console: Real-time price updates, alert configuration, and notification history in action</em></p>
+</div>
 
 **What it demonstrates**:
 - Multi-threaded architecture with signals crossing between threads
@@ -472,6 +478,12 @@ This example is great for seeing how TSignal can be scaled up to more realistic,
 - Similar functionality to the console version, but with a graphical UI
 - `StockView` as a Kivy widget updates UI elements when signals fire
 - `set_alert` and `remove_alert` signals triggered from UI and handled by `StockProcessor`
+
+**Screenshot:**
+<div align="center">
+  <img src="https://raw.githubusercontent.com/TSignalDev/tsignal-python/refs/heads/main/docs/images/stock_monitor_ui.png" alt="Stock Monitor UI" width="800"/>
+  <p><em>Stock Monitor UI: Real-time price updates, alert configuration, and notification history in action</em></p>
+</div>
 
 **What it demonstrates**:
 - Integrating TSignal with Kivy’s main loop and UI elements
