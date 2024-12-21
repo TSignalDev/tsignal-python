@@ -66,7 +66,7 @@ class StockView(BoxLayout):
         # Stock selection (using only AAPL for now, expand as needed)
         self.stock_spinner = Spinner(
             text="AAPL",
-            values=("AAPL",),
+            values=("AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"),
             size_hint_y=None,
             height=40,
         )
@@ -145,6 +145,7 @@ class AsyncKivyApp(App):
 
     def __init__(self):
         super().__init__()
+        self.title = "Stock Monitor"
         self.background_task_running = True
         self.tasks = []
         self.view = None
