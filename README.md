@@ -147,11 +147,11 @@ processor.stop()
 ```
 
 ## Documentation and Example
-- [Usage Guide](docs/usage.md): Learn how to define signals/slots, manage threads, and structure your event-driven code.
-- [API Reference](docs/api.md): Detailed documentation of classes, decorators, and functions.
-- [Examples](docs/examples.md): Practical use cases, including UI integration, async operations, and worker pattern usage.
-- [Logging Guidelines](docs/logging.md): Configure logging levels and handlers for debugging.
-- [Testing Guide](docs/testing.md): earn how to run tests and contribute safely.
+- [Usage Guide](https://github.com/TSignalDev/tsignal-python/blob/main/docs/usage.md): Learn how to define signals/slots, manage threads, and structure your event-driven code.
+- [API Reference](https://github.com/TSignalDev/tsignal-python/blob/main/docs/api.md): Detailed documentation of classes, decorators, and functions.
+- [Examples](https://github.com/TSignalDev/tsignal-python/blob/main/docs/examples.md): Practical use cases, including UI integration, async operations, and worker pattern usage.
+- [Logging Guidelines](https://github.com/TSignalDev/tsignal-python/blob/main/docs/logging.md): Configure logging levels and handlers for debugging.
+- [Testing Guide](https://github.com/TSignalDev/tsignal-python/blob/main/docs/testing.md): earn how to run tests and contribute safely.
 
 ## Logging
 Configure logging to diagnose issues:
@@ -161,7 +161,7 @@ import logging
 logging.getLogger('tsignal').setLevel(logging.DEBUG)
 ```
 
-For more details, see the [Logging Guidelines](docs/logging.md).
+For more details, see the [Logging Guidelines](https://github.com/TSignalDev/tsignal-python/blob/main/docs/logging.md).
 
 ## Testing
 
@@ -178,10 +178,10 @@ pytest -v
 pytest tests/unit/test_signal.py
 ```
 
-See the [Testing Guide](docs/testing.md) for more details.
+See the [Testing Guide](https://github.com/TSignalDev/tsignal-python/blob/main/docs/testing.md) for more details.
 
 ## Contributing
-We welcome contributions. Please read the [Contributing Guidelines](CONTRIBUTING.md) before submitting PRs.
+We welcome contributions. Please read the [Contributing Guidelines](https://github.com/TSignalDev/tsignal-python/blob/main/CONTRIBUTING.md) before submitting PRs.
 
 ## License
-TSignal is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+TSignal is licensed under the MIT License. See [LICENSE](https://github.com/TSignalDev/tsignal-python/blob/main/LICENSE) for details.
