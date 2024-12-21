@@ -1,3 +1,5 @@
+# pylint: disable=missing-module-docstring
+
 """
 TSignal - Python Signal/Slot Implementation
 """
@@ -23,5 +25,5 @@ __all__ = [
     "TConnectionType",
     "TSignalConstants",
     "t_signal_log_and_raise_error",
-    "t_signal_graceful_shutdown",    
+    "t_signal_graceful_shutdown",
 ]

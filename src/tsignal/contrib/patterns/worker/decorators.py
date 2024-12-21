@@ -28,7 +28,70 @@ class _WorkerConstants:
 
 
 def t_with_worker(cls):
-    """Decorator for the worker pattern."""
+    """
+    Class decorator that adds a worker pattern to the decorated class, allowing it
+    to run in a dedicated thread with its own asyncio event loop. This is especially
+    useful for background processing or offloading tasks that should not block the
+    main thread.
+
+    Features
+    --------
+    - **Dedicated Thread & Event Loop**: The decorated class, once started, runs in
+      a new thread with its own event loop.
+    - **Signal/Slot Support**: The worker class can define signals (with `@t_signal`)
+      and slots (`@t_slot`), enabling event-driven communication.
+    - **Task Queue**: A built-in asyncio `Queue` is provided for scheduling coroutines
+      in the worker thread via `queue_task(coro)`.
+    - **Lifecycle Signals**: Automatically emits `started` and `stopped` signals,
+      indicating when the worker thread is up and when it has fully terminated.
+    - **Lifecycle Management**: Methods like `start(...)`, `stop()`, and `move_to_thread(...)`
+      help manage the worker thread's lifecycle and move other `@t_with_signals` objects
+      into this worker thread.
+
+    Usage
+    -----
+    1. Decorate the class with `@t_with_worker`.
+    2. Optionally implement an async `run(*args, **kwargs)` method to control
+       the worker's main logic. This method is run in the worker thread.
+    3. Call `start(...)` to launch the thread and event loop.
+    4. Use `queue_task(...)` to schedule coroutines on the worker's event loop.
+
+    Example
+    -------
+    @t_with_worker
+    class BackgroundWorker:
+        @t_signal
+        def started(self):
+            pass
+
+        @t_signal
+        def stopped(self):
+            pass
+
+        @t_signal
+        def result_ready(self):
+            pass
+
+        async def run(self, config=None):
+            print("Worker started with config:", config)
+            # Wait until stop is requested
+            await self._tsignal_stopping.wait()
+            print("Worker finishing...")
+
+        async def do_work(self, data):
+            await asyncio.sleep(2)
+            self.result_ready.emit(data * 2)
+
+    worker = BackgroundWorker()
+    worker.start(config={'threads': 4})
+    worker.queue_task(worker.do_work(10))
+    worker.stop()
+
+    See Also
+    --------
+    t_slot : Decorates methods as thread-safe or async slots.
+    t_signal : Decorates functions to define signals.
+    """
 
     class WorkerClass(cls):
         """

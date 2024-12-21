@@ -13,7 +13,8 @@ tests/
 │   ├── test_property.py
 │   ├── test_signal.py
 │   ├── test_slot.py
-│   └── test_utils.py
+│   ├── test_utils.py
+│   └── test_weak.py
 ├── integration/        # Integration tests
 │   ├── __init__.py
 │   ├── test_async.py

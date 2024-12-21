@@ -10,6 +10,8 @@ TSignal is a lightweight, pure-Python signal/slot library that provides thread-s
 - **Flexible Connection Types**: Direct or queued connections, automatically chosen based on the caller and callee threads.
 - **Worker Thread Pattern**: Simplify background task execution with a built-in worker pattern that provides an event loop and task queue in a dedicated thread.
 - **Familiar Decorators**: Inspired by Qt’s pattern, `@t_with_signals`, `@t_signal`, and `@t_slot` let you define signals and slots declaratively.
+- **Weak Reference**: 
+  - By setting `weak=True` when connecting a slot, the library holds a weak reference to the receiver object. This allows the receiver to be garbage-collected if there are no other strong references to it. Once garbage-collected, the connection is automatically removed, preventing stale references.
 
 ## Why TSignal?
 
@@ -100,6 +102,7 @@ asyncio.run(main())
 ### Thread Safety and Connection Types
 TSignal automatically detects whether the signal emission and slot execution occur in the same thread or different threads:
 
+- **Auto Connection**: When connection_type is AUTO_CONNECTION (default), TSignal checks whether the slot is a coroutine function or whether the caller and callee share the same thread affinity. If they are the same thread and slot is synchronous, it uses direct connection. Otherwise, it uses queued connection.
 - **Direct Connection**: If signal and slot share the same thread affinity, the slot is invoked directly.
 - **Queued Connection**: If they differ, the call is queued to the slot’s thread/event loop, ensuring thread safety.
 

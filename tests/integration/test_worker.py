@@ -1,12 +1,12 @@
 # tests/integration/test_worker.py
 
-"""
-Test cases for the worker pattern.
-"""
-
 # pylint: disable=no-member
 # pylint: disable=redefined-outer-name
 # pylint: disable=unused-variable
+
+"""
+Test cases for the worker pattern.
+"""
 
 import asyncio
 import logging

@@ -1,12 +1,12 @@
 # tests/unit/test_signal.py
 
-"""
-Test cases for the signal pattern.
-"""
-
 # pylint: disable=unused-argument
 # pylint: disable=unused-variable
 # pylint: disable=too-many-locals
+
+"""
+Test cases for the signal pattern.
+"""
 
 import asyncio
 import logging
@@ -92,7 +92,7 @@ async def test_signal_disconnect_specific_slot(sender, receiver):
 
     # Only async slot should remain
     remaining = sender.value_changed.connections[0]
-    assert remaining[1] == receiver.on_value_changed
+    assert remaining.get_slot_to_call() == receiver.on_value_changed
 
 
 @pytest.mark.asyncio
@@ -136,8 +136,8 @@ async def test_signal_disconnect_specific_receiver_and_slot(sender, receiver):
     assert len(sender.value_changed.connections) == 1
 
     # Only sync slot should remain
-    remaining = sender.value_changed.connections[0]
-    assert remaining[1] == receiver.on_value_changed_sync
+    conn = sender.value_changed.connections[0]
+    assert conn.get_slot_to_call() == receiver.on_value_changed_sync
 
 
 @pytest.mark.asyncio
@@ -294,14 +294,18 @@ async def test_method_connection_with_signal_attributes(sender):
 
     # The connection type of signal_receiver's method is DIRECT_CONNECTION
     # because it has the same thread affinity as the signal
-    receiver, slot, conn_type, is_coro = signal.connections[-1]
-    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    conn = signal.connections[-1]
+    actual_type = _determine_connection_type(
+        conn.conn_type, conn.get_receiver(), signal.owner, conn.is_coro_slot
+    )
     assert actual_type == TConnectionType.DIRECT_CONNECTION
 
     # The connection type of regular class's method is DIRECT_CONNECTION
     # because it has the same thread affinity as the signal
-    receiver, slot, conn_type, is_coro = signal.connections[-1]
-    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    conn = signal.connections[-1]
+    actual_type = _determine_connection_type(
+        conn.conn_type, conn.get_receiver(), signal.owner, conn.is_coro_slot
+    )
     assert actual_type == TConnectionType.DIRECT_CONNECTION
 
     signal.emit(42)
@@ -369,45 +373,112 @@ async def test_connection_type_determination():
     threaded_obj = ThreadedClass()
     worker_obj = WorkerClass()
 
-    # Test sync function connections
     signal = regular_with_signal_obj.test_signal
     signal.connect(regular_handler)
-    receiver, slot, conn_type, is_coro = signal.connections[-1]
-    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+
+    # Test sync function connections
+    conn = signal.connections[-1]
+    actual_type = _determine_connection_type(
+        conn.conn_type, conn.get_receiver(), signal.owner, conn.is_coro_slot
+    )
     assert actual_type == TConnectionType.DIRECT_CONNECTION
 
     # Test async function connections
     signal.connect(async_handler)
-    receiver, slot, conn_type, is_coro = signal.connections[-1]
-    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    conn = signal.connections[-1]
+    actual_type = _determine_connection_type(
+        conn.conn_type, conn.get_receiver(), signal.owner, conn.is_coro_slot
+    )
     assert actual_type == TConnectionType.QUEUED_CONNECTION
 
     # Test regular class method
     signal.connect(regular_obj.handler)
-    receiver, slot, conn_type, is_coro = signal.connections[-1]
-    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    conn = signal.connections[-1]
+    actual_type = _determine_connection_type(
+        conn.conn_type, conn.get_receiver(), signal.owner, conn.is_coro_slot
+    )
     assert actual_type == TConnectionType.DIRECT_CONNECTION
 
     # Test threaded class with sync method
     signal.connect(threaded_obj, threaded_obj.sync_handler)
-    receiver, slot, conn_type, is_coro = signal.connections[-1]
-    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    conn = signal.connections[-1]
+    actual_type = _determine_connection_type(
+        conn.conn_type, conn.get_receiver(), signal.owner, conn.is_coro_slot
+    )
     assert actual_type == TConnectionType.DIRECT_CONNECTION
 
     # Test threaded class with async method
     signal.connect(threaded_obj, threaded_obj.async_handler)
-    receiver, slot, conn_type, is_coro = signal.connections[-1]
-    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    conn = signal.connections[-1]
+    actual_type = _determine_connection_type(
+        conn.conn_type, conn.get_receiver(), signal.owner, conn.is_coro_slot
+    )
     assert actual_type == TConnectionType.QUEUED_CONNECTION
 
     # Test worker class with sync method
     signal.connect(worker_obj.sync_handler)
-    receiver, slot, conn_type, is_coro = signal.connections[-1]
-    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    conn = signal.connections[-1]
+    actual_type = _determine_connection_type(
+        conn.conn_type, conn.get_receiver(), signal.owner, conn.is_coro_slot
+    )
     assert actual_type == TConnectionType.QUEUED_CONNECTION
 
     # Test worker class with async method
     signal.connect(worker_obj.async_handler)
-    receiver, slot, conn_type, is_coro = signal.connections[-1]
-    actual_type = _determine_connection_type(conn_type, receiver, signal.owner, is_coro)
+    conn = signal.connections[-1]
+    actual_type = _determine_connection_type(
+        conn.conn_type, conn.get_receiver(), signal.owner, conn.is_coro_slot
+    )
     assert actual_type == TConnectionType.QUEUED_CONNECTION
+
+
+async def test_one_shot():
+    """
+    Verifies that one_shot connections are triggered exactly once,
+    then removed automatically upon the first call.
+    """
+
+    @t_with_signals
+    class OneShotSender:
+        """
+        A class that sends one-shot events.
+        """
+
+        @t_signal
+        def one_shot_event(self, value):
+            """
+            One-shot event signal.
+            """
+
+    class OneShotReceiver:
+        """
+        A class that receives one-shot events.
+        """
+
+        def __init__(self):
+            self.called_count = 0
+
+        def on_event(self, value):
+            """
+            Event handler.
+            """
+
+            self.called_count += 1
+
+    sender = OneShotSender()
+    receiver = OneShotReceiver()
+
+    sender.one_shot_event.connect(receiver, receiver.on_event, one_shot=True)
+
+    sender.one_shot_event.emit(123)
+    # Ensure all processing is complete
+    await asyncio.sleep(1)
+
+    # Already called once, so second emit should not trigger on_event
+    sender.one_shot_event.emit(456)
+    await asyncio.sleep(1)
+
+    # Check if it was called only once
+    assert (
+        receiver.called_count == 1
+    ), "Receiver should only be called once for a one_shot connection"

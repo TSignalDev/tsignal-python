@@ -126,10 +126,12 @@ Represents a signal. Signals are created by `@t_signal` and accessed as class at
 Connects the signal to a slot.
 
 - **Parameters:**
-  - receiver_or_slot: Either the receiver object and slot method, or just a callable (function/lambda) if slot is None.
-  - slot: The method in the receiver if a receiver object is provided.
-  - connection_type: DIRECT_CONNECTION, QUEUED_CONNECTION, or AUTO_CONNECTION.
-    - AUTO_CONNECTION (default): Determines connection type automatically based on thread affinity and slot type.
+  - **receiver_or_slot:** Either the receiver object and slot method, or just a callable (function/lambda) if slot is None.
+  - **slot:** The method in the receiver if a receiver object is provided.
+  - **connection_type:** DIRECT_CONNECTION, QUEUED_CONNECTION, or AUTO_CONNECTION.
+    - **AUTO_CONNECTION (default):** Determines connection type automatically based on thread affinity and slot type.
+  - **weak:** If `True`, the receiver is kept via a weak reference so it can be garbage collected once there are no strong references. The signal automatically removes the connection if the receiver is collected.
+  - **one_shot:** If `True`, the connection is automatically disconnected after the first successful emit call. This is useful for events that should only notify a slot once.
 
 **Examples:**
 
@@ -151,9 +153,29 @@ signal.connect(print)
 
 Disconnects a previously connected slot. Returns the number of disconnected connections.
 
+- **Parameters:**
+  - receiver: The object whose slot is connected. If receiver is None, all receivers are considered.
+  - slot: The specific slot to disconnect from the signal. If slot is None, all slots for the given receiver (or all connections if receiver is also None) are disconnected.
+- **Returns:** The number of connections that were disconnected.- 
+
+**Examples:**
+```python
+# Disconnect all connections
+signal.disconnect()
+
+# Disconnect all slots from a specific receiver
+signal.disconnect(receiver=my_receiver)
+
+# Disconnect a specific slot from a specific receiver
+signal.disconnect(receiver=my_receiver, slot=my_receiver.some_slot)
+
+# Disconnect a standalone function
+signal.disconnect(slot=my_function)
+```
+
 `emit(*args, **kwargs) -> None`
 
-Emits the signal, invoking all connected slots either directly or via the event loop of the slot’s associated thread.
+Emits the signal, invoking all connected slots either directly or via the event loop of the slot’s associated thread, depending on the connection type. If a connection is marked one_shot, it is automatically removed right after invocation.
 
 `TConnectionType`
 

@@ -1,12 +1,13 @@
 # tests/performance/test_memory.py
 
-"""
-Test cases for memory usage.
-"""
-
 # pylint: disable=no-member
 # pylint: disable=redefined-outer-name
 # pylint: disable=unused-variable
+
+
+"""
+Test cases for memory usage.
+"""
 
 import pytest
 from tsignal import t_with_signals, t_signal, t_slot

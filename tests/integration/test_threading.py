@@ -1,11 +1,11 @@
 # tests/integration/test_threading.py
 
+# pylint: disable=unused-argument
+# pylint: disable=unnecessary-lambda
+
 """
 Test cases for threading.
 """
-
-# pylint: disable=unused-argument
-# pylint: disable=unnecessary-lambda
 
 import asyncio
 import threading

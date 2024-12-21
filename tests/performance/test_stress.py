@@ -1,12 +1,12 @@
 # tests/performance/test_stress.py
 
-"""
-Test cases for stress testing.
-"""
-
 # pylint: disable=no-member
 # pylint: disable=redefined-outer-name
 # pylint: disable=unused-variable
+
+"""
+Test cases for stress testing.
+"""
 
 import asyncio
 import logging

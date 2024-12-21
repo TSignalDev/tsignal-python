@@ -1,13 +1,13 @@
 # tests/integration/test_worker_signal.py
 
-"""
-Test cases for the worker-signal pattern.
-"""
-
 # pylint: disable=redefined-outer-name
 # pylint: disable=unnecessary-lambda
 # pylint: disable=unnecessary-lambda-assignment
 # pylint: disable=no-member
+
+"""
+Test cases for the worker-signal pattern.
+"""
 
 import asyncio
 import logging
