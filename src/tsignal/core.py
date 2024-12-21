@@ -1,5 +1,11 @@
 # src/tsignal/core.py
 
+# pylint: disable=unnecessary-dunder-call
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-locals
+# pylint: disable=too-many-branches
+# pylint: disable=too-many-positional-arguments
+
 """
 Implementation of the Signal class for tsignal.
 
@@ -11,10 +17,12 @@ from enum import Enum
 import asyncio
 import concurrent.futures
 import contextvars
+from dataclasses import dataclass
 import functools
 import logging
+import weakref
 import threading
-from typing import Callable
+from typing import Callable, Optional
 from tsignal.utils import t_signal_log_and_raise_error
 
 logger = logging.getLogger(__name__)
@@ -27,6 +35,7 @@ class TSignalConstants:
     THREAD = "_tsignal_thread"
     LOOP = "_tsignal_loop"
     AFFINITY = "_tsignal_affinity"
+    WEAK_DEFAULT = "_tsignal_weak_default"
 
 
 _tsignal_from_emit = contextvars.ContextVar(TSignalConstants.FROM_EMIT, default=False)
@@ -38,6 +47,61 @@ class TConnectionType(Enum):
     DIRECT_CONNECTION = 1
     QUEUED_CONNECTION = 2
     AUTO_CONNECTION = 3
+
+
+@dataclass
+class TConnection:
+    """Connection class for signal-slot connections."""
+
+    receiver_ref: Optional[object]
+    slot_func: Callable
+    conn_type: TConnectionType
+    is_coro_slot: bool
+    is_bound: bool
+    is_weak: bool
+    is_one_shot: bool = False
+
+    def get_receiver(self):
+        """If receiver_ref is a weakref, return the actual receiver. Otherwise, return the receiver_ref as is."""
+
+        if self.is_weak and isinstance(self.receiver_ref, weakref.ref):
+            return self.receiver_ref()
+        return self.receiver_ref
+
+    def is_valid(self):
+        """Check if the receiver is alive if it's a weakref."""
+
+        if self.is_weak and isinstance(self.receiver_ref, weakref.ref):
+            return self.receiver_ref() is not None
+        return True
+
+    def get_slot_to_call(self):
+        """
+        Return the slot to call at emit time.
+        For weakref bound method connections, reconstruct the bound method after recovering the receiver.
+        For strong reference, it's already a bound method, so return it directly.
+        For standalone functions, return them directly.
+        """
+
+        if not self.is_bound:
+            # standalone function
+            return self.slot_func
+
+        receiver = self.get_receiver()
+
+        if receiver is None:
+            # weak ref is dead
+            return None
+
+        # Restore bound method
+        if self.is_weak:
+            # slot_func is an unbound function, so reconstruct the bound method using __get__
+            return self.slot_func.__get__(receiver, type(receiver))
+
+        # For instance of strong reference, slot_func may be already bound method,
+        # or it may be bound method at connect time.
+        # In either case, it can be returned directly.
+        return self.slot_func
 
 
 def _wrap_standalone_function(func, is_coroutine):
@@ -77,25 +141,72 @@ def _determine_connection_type(conn_type, receiver, owner, is_coro_slot):
     """
     actual_conn_type = conn_type
 
+    logger.debug(
+        "[TSignal][_determine_connection_type] conn_type=%s receiver=%s owner=%s is_coro_slot=%s",
+        conn_type,
+        receiver,
+        owner,
+        is_coro_slot,
+    )
+
     if conn_type == TConnectionType.AUTO_CONNECTION:
         if is_coro_slot:
             actual_conn_type = TConnectionType.QUEUED_CONNECTION
+            logger.debug(
+                "[TSignal][_determine_connection_type] actual_conn_type=%s reason=is_coro_slot",
+                actual_conn_type,
+            )
         else:
+            receiver = receiver() if isinstance(receiver, weakref.ref) else receiver
+
+            is_receiver_valid = receiver is not None
+            has_thread = hasattr(receiver, TSignalConstants.THREAD)
+            has_affinity = hasattr(receiver, TSignalConstants.AFFINITY)
+            has_owner_thread = hasattr(owner, TSignalConstants.THREAD)
+            has_owner_affinity = hasattr(owner, TSignalConstants.AFFINITY)
+
             if (
-                receiver is not None
-                and hasattr(receiver, TSignalConstants.THREAD)
-                and hasattr(owner, TSignalConstants.THREAD)
-                and hasattr(receiver, TSignalConstants.AFFINITY)
-                and hasattr(owner, TSignalConstants.AFFINITY)
+                is_receiver_valid
+                and has_thread
+                and has_owner_thread
+                and has_affinity
+                and has_owner_affinity
             ):
                 if receiver._tsignal_affinity == owner._tsignal_affinity:
                     actual_conn_type = TConnectionType.DIRECT_CONNECTION
+                    logger.debug(
+                        "[TSignal][_determine_connection_type] actual_conn_type=%s reason=same_thread",
+                        actual_conn_type,
+                    )
                 else:
                     actual_conn_type = TConnectionType.QUEUED_CONNECTION
+                    logger.debug(
+                        "[TSignal][_determine_connection_type] actual_conn_type=%s reason=different_thread",
+                        actual_conn_type,
+                    )
             else:
                 actual_conn_type = TConnectionType.DIRECT_CONNECTION
+                logger.debug(
+                    "[TSignal][_determine_connection_type] actual_conn_type=%s reason=no_receiver or invalid thread or affinity "
+                    "is_receiver_valid=%s has_thread=%s has_affinity=%s has_owner_thread=%s has_owner_affinity=%s",
+                    actual_conn_type,
+                    is_receiver_valid,
+                    has_thread,
+                    has_affinity,
+                    has_owner_thread,
+                    has_owner_affinity,
+                )
 
     return actual_conn_type
+
+
+def _extract_unbound_function(callable_obj):
+    """
+    Extract the unbound function from a bound method.
+    If the slot is a bound method, return the unbound function (__func__), otherwise return the slot as is.
+    """
+
+    return getattr(callable_obj, "__func__", callable_obj)
 
 
 class TSignal:
@@ -104,14 +215,67 @@ class TSignal:
     def __init__(self):
         self.connections = []
         self.owner = None
+        self.connections_lock = threading.RLock()
 
     def connect(
-        self, receiver_or_slot, slot=None, conn_type=TConnectionType.AUTO_CONNECTION
+        self,
+        receiver_or_slot,
+        slot=None,
+        conn_type=TConnectionType.AUTO_CONNECTION,
+        weak=None,
+        one_shot=False,
     ):
         """
-        Connect signal to a slot with an optional connection type.
-        If conn_type is AUTO_CONNECTION, the actual type (direct or queued)
-        is determined at emit time based on threads.
+        Connect this signal to a slot (callable). The connected slot will be invoked
+        on each `emit()` call.
+
+        Parameters
+        ----------
+        receiver_or_slot : object or callable
+            If `slot` is omitted, this can be a standalone callable (function or lambda),
+            or a bound method. Otherwise, this is treated as the receiver object.
+        slot : callable, optional
+            When `receiver_or_slot` is a receiver object, `slot` should be the method
+            to connect. If both `receiver_or_slot` and `slot` are given, this effectively
+            connects the signal to the method `slot` of the given `receiver`.
+        conn_type : TConnectionType, optional
+            Specifies how the slot is invoked relative to the signal emitter. Defaults to
+            `TConnectionType.AUTO_CONNECTION`, which automatically determines direct or queued
+            invocation based on thread affinity and slot type (sync/async).
+        weak : bool, optional
+            If `True`, a weak reference to the receiver is stored so the connection
+            is automatically removed once the receiver is garbage-collected.
+            If omitted (`None`), the default is determined by the decorator `@t_with_signals`
+            (i.e., `weak_default`).
+        one_shot : bool, optional
+            If `True`, this connection is automatically disconnected right after the
+            first successful emission. Defaults to `False`.
+
+        Raises
+        ------
+        TypeError
+            If the provided slot is not callable or if `receiver_or_slot` is not callable
+            when `slot` is `None`.
+        AttributeError
+            If `receiver_or_slot` is `None` while `slot` is provided.
+        ValueError
+            If `conn_type` is invalid (not one of AUTO_CONNECTION, DIRECT_CONNECTION, QUEUED_CONNECTION).
+
+        Examples
+        --------
+        # Connect a bound method
+        signal.connect(receiver, receiver.some_method)
+
+        # Connect a standalone function
+        def standalone_func(value):
+            print("Received:", value)
+        signal.connect(standalone_func)
+
+        # One-shot connection
+        signal.connect(receiver, receiver.one_time_handler, one_shot=True)
+
+        # Weak reference connection
+        signal.connect(receiver, receiver.on_event, weak=True)
         """
 
         logger.debug(
@@ -120,6 +284,9 @@ class TSignal:
             receiver_or_slot,
             slot,
         )
+
+        if weak is None and self.owner is not None:
+            weak = getattr(self.owner, TSignalConstants.WEAK_DEFAULT, False)
 
         if slot is None:
             if not callable(receiver_or_slot):
@@ -130,6 +297,11 @@ class TSignal:
                 )
 
             receiver = None
+            is_bound_method = hasattr(receiver_or_slot, "__self__")
+            maybe_slot = (
+                receiver_or_slot.__func__ if is_bound_method else receiver_or_slot
+            )
+            is_coro_slot = asyncio.iscoroutinefunction(maybe_slot)
 
             is_coro_slot = asyncio.iscoroutinefunction(
                 receiver_or_slot.__func__
@@ -137,8 +309,9 @@ class TSignal:
                 else receiver_or_slot
             )
 
-            if hasattr(receiver_or_slot, "__self__"):
+            if is_bound_method:
                 obj = receiver_or_slot.__self__
+
                 if hasattr(obj, TSignalConstants.THREAD) and hasattr(
                     obj, TSignalConstants.LOOP
                 ):
@@ -156,6 +329,7 @@ class TSignal:
                     AttributeError,
                     "[TSignal][connect] Receiver cannot be None.",
                 )
+
             if not callable(slot):
                 t_signal_log_and_raise_error(
                     logger, TypeError, "[TSignal][connect] Slot must be callable."
@@ -175,61 +349,223 @@ class TSignal:
         ):
             t_signal_log_and_raise_error(logger, ValueError, "Invalid connection type.")
 
-        conn = (receiver, slot, conn_type, is_coro_slot)
+        is_bound = False
+
+        if hasattr(slot, "__self__") and slot.__self__ is not None:
+            # It's a bound method
+            slot_instance = slot.__self__
+            slot_func = slot.__func__
+            is_bound = True
+
+            if weak and receiver is not None:
+                receiver_ref = weakref.ref(slot_instance, self._cleanup_on_ref_dead)
+                conn = TConnection(
+                    receiver_ref,
+                    slot_func,
+                    conn_type,
+                    is_coro_slot,
+                    is_bound,
+                    True,
+                    one_shot,
+                )
+            else:
+                # strong ref
+                conn = TConnection(
+                    slot_instance,
+                    slot,
+                    conn_type,
+                    is_coro_slot,
+                    is_bound,
+                    False,
+                    one_shot,
+                )
+        else:
+            # standalone function or lambda
+            # weak not applied to function itself, since no receiver
+            is_bound = False
+            conn = TConnection(
+                None, slot, conn_type, is_coro_slot, is_bound, False, one_shot
+            )
+
         logger.debug("[TSignal][connect][END] conn=%s", conn)
 
-        self.connections.append(conn)
+        with self.connections_lock:
+            self.connections.append(conn)
+
+    def _cleanup_on_ref_dead(self, ref):
+        """Cleanup connections on weak reference death."""
+        # ref is a weak reference to the receiver
+        # Remove connections associated with the dead receiver
+        with self.connections_lock:
+            self.connections = [
+                conn for conn in self.connections if conn.receiver_ref is not ref
+            ]
 
     def disconnect(self, receiver: object = None, slot: Callable = None) -> int:
-        """Disconnect signal from slot(s)."""
+        """
+        Disconnects one or more slots from the signal. This method attempts to find and remove
+        connections that match the given `receiver` and/or `slot`.
 
-        if receiver is None and slot is None:
-            count = len(self.connections)
-            self.connections.clear()
-            return count
+        Parameters
+        ----------
+        receiver : object, optional
+            The receiver object initially connected to the signal. If omitted, matches any receiver.
+        slot : Callable, optional
+            The slot (callable) that was connected to the signal. If omitted, matches any slot.
 
-        original_count = len(self.connections)
-        new_connections = []
+        Returns
+        -------
+        int
+            The number of connections successfully disconnected.
 
-        for r, s, t, c in self.connections:
-            # Compare original function and wrapped function for directly connected functions
-            if r is None and slot is not None:
-                if getattr(s, "__wrapped__", None) == slot or s == slot:
+        Notes
+        -----
+        - If neither `receiver` nor `slot` is specified, all connections are removed.
+        - If only `receiver` is given (and `slot=None`), all connections involving that receiver will be removed.
+        - If only `slot` is given (and `receiver=None`), all connections involving that slot are removed.
+        - If both `receiver` and `slot` are given, only the connections that match both will be removed.
+
+        Example
+        -------
+        Consider a signal connected to multiple slots of a given receiver:
+
+        >>> signal.disconnect(receiver=my_receiver)
+        # All connections associated with `my_receiver` are removed.
+
+        Or if a specific slot was connected:
+
+        >>> signal.disconnect(slot=my_specific_slot)
+        # All connections to `my_specific_slot` are removed.
+
+        Passing both `receiver` and `slot`:
+
+        >>> signal.disconnect(receiver=my_receiver, slot=my_specific_slot)
+        # Only the connections that match both `my_receiver` and `my_specific_slot` are removed.
+        """
+
+        with self.connections_lock:
+            if receiver is None and slot is None:
+                # No receiver or slot specified, remove all connections.
+                count = len(self.connections)
+                self.connections.clear()
+                return count
+
+            original_count = len(self.connections)
+            new_connections = []
+
+            logger.debug(
+                "[TSignal][disconnect][START] receiver: %s slot: %s original_count: %s",
+                receiver,
+                slot,
+                original_count,
+            )
+
+            # In case slot is a bound method, convert it to an unbound function.
+            slot_unbound = _extract_unbound_function(slot)
+
+            for conn in self.connections:
+                # If the connection does not reference a receiver (standalone function)
+                # and a slot is specified, check if the connected func_or_slot matches the given slot.
+                receiver_match = receiver is None or conn.get_receiver() == receiver
+                slot_match = (
+                    slot is None
+                    or conn.slot_func == slot_unbound
+                    or getattr(conn.slot_func, "__wrapped__", None) == slot_unbound
+                )
+
+                if receiver_match and slot_match:
+                    # remove this connection
+                    logger.debug(
+                        "[TSignal][disconnect][MATCHED] func: %s receiver_match: %s slot_match: %s",
+                        conn.slot_func,
+                        receiver_match,
+                        slot_match,
+                    )
                     continue
-            elif (receiver is None or r == receiver) and (slot is None or s == slot):
-                continue
-            new_connections.append((r, s, t, c))
 
-        self.connections = new_connections
-        disconnected = original_count - len(self.connections)
+                # If the connection was not matched by the given criteria, keep it.
+                logger.debug(
+                    "[TSignal][disconnect][NOT MATCHED] func: %s", conn.slot_func
+                )
+                new_connections.append((conn))
 
-        return disconnected
+            self.connections = new_connections
+            disconnected = original_count - len(self.connections)
+
+            logger.debug(
+                "[TSignal][disconnect][END] disconnected: %s",
+                disconnected,
+            )
+            return disconnected
 
     def emit(self, *args, **kwargs):
-        """Emit signal to connected slots."""
+        """
+        Emit the signal with the specified arguments. All connected slots will be
+        invoked, either directly or via their respective event loops, depending on
+        the connection type and thread affinity.
+
+        Parameters
+        ----------
+        *args : Any
+            Positional arguments passed on to each connected slot.
+        **kwargs : Any
+            Keyword arguments passed on to each connected slot.
+
+        Notes
+        -----
+        - When a connected slot is marked with `is_one_shot=True`, it is automatically
+        disconnected immediately after being invoked for the first time.
+        - If a slot was connected with a weak reference (`weak=True`) and its receiver
+        has been garbage-collected, that connection is skipped and removed from the
+        internal list of connections.
+        - If the slot is asynchronous and `conn_type` is `AUTO_CONNECTION`, it typically
+        uses a queued connection (queued to the slot’s event loop).
+        - If an exception occurs in a slot, the exception is logged, but does not halt
+        the emission to other slots.
+
+        Examples
+        --------
+        signal.emit(42, message="Hello")
+        """
 
         logger.debug("[TSignal][emit][START]")
 
         token = _tsignal_from_emit.set(True)
 
+        with self.connections_lock:
+            # copy list to avoid iteration issues during emit
+            current_conns = list(self.connections)
+
         # pylint: disable=too-many-nested-blocks
         try:
-            for receiver, slot, conn_type, is_coro_slot in self.connections:
+            for conn in current_conns:
+                if conn.is_bound and not conn.is_valid():
+                    with self.connections_lock:
+                        if conn in self.connections:
+                            self.connections.remove(conn)
+                    continue
+
+                slot_to_call = conn.get_slot_to_call()
+
+                if slot_to_call is None:
+                    # Unable to call bound method due to receiver GC or other reasons
+                    continue
+
                 actual_conn_type = _determine_connection_type(
-                    conn_type, receiver, self.owner, is_coro_slot
+                    conn.conn_type, conn.get_receiver(), self.owner, conn.is_coro_slot
                 )
 
                 logger.debug(
                     "[TSignal][emit] slot=%s receiver=%s conn_type=%s",
-                    slot.__name__,
-                    receiver,
+                    getattr(slot_to_call, "__name__", slot_to_call),
+                    conn.get_receiver(),
                     actual_conn_type,
                 )
 
                 try:
                     if actual_conn_type == TConnectionType.DIRECT_CONNECTION:
                         logger.debug("[TSignal][emit][DIRECT] calling slot directly")
-                        result = slot(*args, **kwargs)
+                        result = slot_to_call(*args, **kwargs)
                         logger.debug(
                             "[TSignal][emit][DIRECT] result=%s result_type=%s",
                             result,
@@ -237,14 +573,16 @@ class TSignal:
                         )
                     else:
                         # Handle QUEUED CONNECTION
+                        receiver = conn.get_receiver()
+
                         if receiver is not None:
                             receiver_loop = getattr(
                                 receiver, TSignalConstants.LOOP, None
                             )
-
                             receiver_thread = getattr(
                                 receiver, TSignalConstants.THREAD, None
                             )
+
                             if not receiver_loop:
                                 logger.error(
                                     "[TSignal][emit][QUEUED] No event loop found for receiver. receiver=%s",
@@ -279,20 +617,25 @@ class TSignal:
 
                         logger.debug(
                             "[TSignal][emit][QUEUED] slot=%s is_coroutine=%s",
-                            slot.__name__,
-                            is_coro_slot,
+                            getattr(slot_to_call, "__name__", slot_to_call),
+                            conn.is_coro_slot,
                         )
 
-                        def dispatch(slot=slot, is_coro_slot=is_coro_slot):
+                        def dispatch(
+                            is_coro_slot=conn.is_coro_slot,
+                            slot_to_call=slot_to_call,
+                        ):
                             logger.debug(
                                 "[TSignal][emit][QUEUED][dispatch] calling slot=%s",
-                                slot.__name__,
+                                getattr(slot_to_call, "__name__", slot_to_call),
                             )
 
                             if is_coro_slot:
-                                returned = asyncio.create_task(slot(*args, **kwargs))
+                                returned = asyncio.create_task(
+                                    slot_to_call(*args, **kwargs)
+                                )
                             else:
-                                returned = slot(*args, **kwargs)
+                                returned = slot_to_call(*args, **kwargs)
 
                             logger.debug(
                                 "[TSignal][emit][QUEUED][dispatch] returned=%s type=%s",
@@ -308,6 +651,12 @@ class TSignal:
                     logger.error(
                         "[TSignal][emit] error in emission: %s", e, exc_info=True
                     )
+
+                if conn.is_one_shot:
+                    with self.connections_lock:
+                        if conn in self.connections:
+                            self.connections.remove(conn)
+
         finally:
             _tsignal_from_emit.reset(token)
 
@@ -333,7 +682,42 @@ class TSignalProperty(property):
 
 
 def t_signal(func):
-    """Signal decorator"""
+    """
+    Decorator that defines a signal attribute within a class decorated by `@t_with_signals`.
+    The decorated function name is used as the signal name, and it provides a lazy-initialized
+    `TSignal` instance.
+
+    Parameters
+    ----------
+    func : function
+        A placeholder function that helps to define the signal's name and docstring. The
+        function body is ignored at runtime, as the signal object is created and stored
+        dynamically.
+
+    Returns
+    -------
+    TSignalProperty
+        A property-like descriptor that, when accessed, returns the underlying `TSignal` object.
+
+    Notes
+    -----
+    - A typical usage looks like:
+      ```python
+      @t_with_signals
+      class MyClass:
+          @t_signal
+          def some_event(self):
+              # The body here is never called at runtime.
+              pass
+      ```
+    - You can then emit the signal via `self.some_event.emit(...)`.
+    - The actual signal object is created and cached when first accessed.
+
+    See Also
+    --------
+    t_with_signals : Decorates a class to enable signal/slot features.
+    TSignal : The class representing an actual signal (internal usage).
+    """
 
     sig_name = func.__name__
 
@@ -348,7 +732,50 @@ def t_signal(func):
 
 
 def t_slot(func):
-    """Slot decorator"""
+    """
+    Decorator that marks a method as a 'slot' for TSignal. Slots can be either synchronous
+    or asynchronous, and TSignal automatically handles cross-thread invocation.
+
+    If this decorated method is called directly (i.e., not via a signal’s `emit()`)
+    from a different thread than the slot’s home thread/event loop, TSignal also ensures
+    that the call is dispatched (queued) correctly to the slot's thread. This guarantees
+    consistent and thread-safe execution whether the slot is triggered by a signal emit
+    or by a direct method call.
+
+    Parameters
+    ----------
+    func : function or coroutine
+        The method to be decorated as a slot. If it's a coroutine (async def), TSignal
+        treats it as an async slot.
+
+    Returns
+    -------
+    function or coroutine
+        A wrapped version of the original slot, with added thread/loop handling for
+        cross-thread invocation.
+
+    Notes
+    -----
+    - If the slot is synchronous and the emitter (or caller) is in another thread,
+      TSignal queues a function call to the slot’s thread/event loop.
+    - If the slot is asynchronous (`async def`), TSignal ensures that the coroutine
+      is scheduled on the correct event loop.
+    - The threading affinity and event loop references are automatically assigned
+      by `@t_with_signals` or `@t_with_worker` when the class instance is created.
+
+    Examples
+    --------
+    @t_with_signals
+    class Receiver:
+        @t_slot
+        def on_data_received(self, data):
+            print("Synchronous slot called in a thread-safe manner.")
+
+        @t_slot
+        async def on_data_received_async(self, data):
+            await asyncio.sleep(1)
+            print("Asynchronous slot called in a thread-safe manner.")
+    """
 
     is_coroutine = asyncio.iscoroutinefunction(func)
 
@@ -430,8 +857,55 @@ def t_slot(func):
     return wrap
 
 
-def t_with_signals(cls, *, loop=None):
-    """Decorator for classes using signals"""
+def t_with_signals(cls=None, *, loop=None, weak_default=True):
+    """
+    Class decorator that enables the use of TSignal-based signals and TSlot-based slots.
+    When applied, it assigns an event loop and a thread affinity to each instance,
+    providing automatic threading support for signals and slots.
+
+    Parameters
+    ----------
+    cls : class, optional
+        The class to be decorated. If not provided, returns a decorator that can be
+        applied to a class.
+    loop : asyncio.AbstractEventLoop, optional
+        An event loop to be assigned to the instances of the decorated class. If omitted,
+        TSignal attempts to retrieve the current running loop. If none is found, it raises
+        an error or creates a new event loop in some contexts.
+    weak_default : bool, optional
+        Determines the default value for `weak` connections on signals from instances of
+        this class. If `True`, any signal `connect` call without a specified `weak` argument
+        will store a weak reference to the receiver. Defaults to `True`.
+
+    Returns
+    -------
+    class
+        The decorated class, now enabled with signal/slot features.
+
+    Notes
+    -----
+    - This decorator modifies the class’s `__init__` method to automatically assign
+      `_tsignal_thread`, `_tsignal_loop`, `_tsignal_affinity`, and `_tsignal_weak_default`.
+    - Typically, you’ll write:
+      ```python
+      @t_with_signals
+      class MyClass:
+          @t_signal
+          def some_event(self):
+              pass
+      ```
+      Then create an instance: `obj = MyClass()`, and connect signals as needed.
+    - The `weak_default` argument can be overridden on a per-connection basis
+      by specifying `weak=True` or `weak=False` in `connect`.
+
+    Example
+    -------
+    @t_with_signals(loop=some_asyncio_loop, weak_default=False)
+    class MySender:
+        @t_signal
+        def message_sent(self):
+            pass
+    """
 
     def wrap(cls):
         """Wrap class with signals"""
@@ -455,6 +929,7 @@ def t_with_signals(cls, *, loop=None):
             self._tsignal_thread = threading.current_thread()
             self._tsignal_affinity = self._tsignal_thread
             self._tsignal_loop = current_loop
+            self._tsignal_weak_default = weak_default
 
             # Call the original __init__
             original_init(self, *args, **kwargs)

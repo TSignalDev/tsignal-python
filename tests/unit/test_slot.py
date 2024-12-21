@@ -1,10 +1,11 @@
 # tests/unit/test_slot.py
 
+# pylint: disable=duplicate-code
+# pylint: disable=no-member
+
 """
 Test cases for the slot pattern.
 """
-
-# pylint: disable=no-member
 
 import asyncio
 import threading

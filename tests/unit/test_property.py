@@ -1,12 +1,12 @@
 # tests/unit/test_property.py
 
-"""
-Test cases for the property pattern.
-"""
-
 # pylint: disable=no-member
 # pylint: disable=unnecessary-lambda
 # pylint: disable=useless-with-lock
+
+"""
+Test cases for the property pattern.
+"""
 
 import asyncio
 import threading

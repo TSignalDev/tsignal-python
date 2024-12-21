@@ -1,11 +1,16 @@
 # examples/stock_monitor_simple.py
 
-"""
-Stock monitor simple example.
-"""
-
 # pylint: disable=no-member
 # pylint: disable=unused-argument
+
+"""
+Stock monitor simple example.
+
+This module shows a straightforward example of using a worker (`DataWorker`)
+to generate data continuously and a display (`DataDisplay`) to process and
+log that data on the main thread. It's a minimal demonstration of TSignal's
+thread-safe signal/slot invocation.
+"""
 
 import asyncio
 import logging
@@ -20,7 +25,26 @@ logger = logger_setup(__name__, level=logging.DEBUG)
 
 @t_with_worker
 class DataWorker:
-    """Data worker"""
+    """
+    A simple data worker that emits incrementing integers every second.
+
+    Attributes
+    ----------
+    _running : bool
+        Indicates whether the update loop is active.
+    _update_task : asyncio.Task, optional
+        The asynchronous task that updates and emits data.
+
+    Signals
+    -------
+    data_processed
+        Emitted with the incremented integer each time data is processed.
+
+    Lifecycle
+    ---------
+    - `run(...)` is called automatically in the worker thread.
+    - `stop()` stops the worker, cancelling the update loop.
+    """
 
     def __init__(self):
         self._running = False
@@ -28,10 +52,18 @@ class DataWorker:
 
     @t_signal
     def data_processed(self):
-        """Signal emitted when data is processed"""
+        """
+        Signal emitted when data is processed.
+
+        Receives an integer count.
+        """
 
     async def run(self, *args, **kwargs):
-        """Worker initialization"""
+        """
+        Worker initialization and main event loop.
+
+        Creates the update loop task and waits until the worker is stopped.
+        """
 
         logger.info("[DataWorker][run] Starting")
 
@@ -51,7 +83,11 @@ class DataWorker:
                 pass
 
     async def update_loop(self):
-        """Update loop"""
+        """
+        Periodically emits a counter value.
+
+        Every second, the counter increments and `data_processed` is emitted.
+        """
 
         count = 0
 
@@ -66,7 +102,14 @@ class DataWorker:
 
 @t_with_signals
 class DataDisplay:
-    """Data display"""
+    """
+    A display class that receives the processed data from the worker.
+
+    Attributes
+    ----------
+    last_value : int or None
+        Stores the last received value from the worker.
+    """
 
     def __init__(self):
         self.last_value = None
@@ -74,7 +117,11 @@ class DataDisplay:
 
     @t_slot
     def on_data_processed(self, value):
-        """Slot called when data is processed"""
+        """
+        Slot called when data is processed.
+
+        Logs the received value and simulates a brief processing delay.
+        """
 
         current_thread = threading.current_thread()
         logger.debug(
@@ -87,7 +134,9 @@ class DataDisplay:
 
 
 async def main():
-    """Main function"""
+    """
+    Main function demonstrating how to set up and run the worker and display.
+    """
 
     logger.debug("[Main] Starting in thread: %s", threading.current_thread().name)
 

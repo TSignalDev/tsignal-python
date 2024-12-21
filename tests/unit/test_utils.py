@@ -1,10 +1,10 @@
 # tests/unit/test_utils.py
 
-"""Test utils"""
-
 # pylint: disable=no-member
 # pylint: disable=unused-argument
 # pylint: disable=redefined-outer-name
+
+"""Test utils"""
 
 from unittest.mock import MagicMock
 import logging

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2024-12-21
+
+### Added
+- **Weak Reference Support**: Introduced `weak=True` for signal connections to allow automatic disconnection when the receiver is garbage-collected.
+- **One-Shot Connections**: Added `one_shot=True` in `connect(...)` to enable automatically disconnecting a slot after its first successful emission call.
+- Extended integration tests to cover new `weak` and `one_shot` functionality.
+
+### Improved
+- **Thread Safety**: Strengthened internal locking and concurrency patterns to reduce race conditions in high-load or multi-threaded environments.
+- **Documentation**: Updated `readme.md`, `api.md`, and example code sections to explain weak references, one-shot usage, and improved thread-safety details.
+
 ## [0.3.0] - 2024-12-19
 
 ### Changed

@@ -3,7 +3,20 @@
 # pylint: disable=no-member
 
 """
-Stock monitoring core classes
+Stock monitoring core classes and logic.
+
+This module provides a simulated stock market data generator (`StockService`),
+a processor for handling price updates and alerts (`StockProcessor`), and a
+view-model class (`StockViewModel`) that can be connected to various UI or CLI
+front-ends.
+
+Usage:
+  1. Instantiate `StockService` to generate price data.
+  2. Instantiate `StockProcessor` to handle alert conditions and further processing.
+  3. Instantiate `StockViewModel` to manage UI-related state or to relay
+     processed data to the presentation layer.
+  4. Connect the signals/slots between these objects to build a reactive flow
+     that updates real-time stock information and triggers alerts when conditions are met.
 """
 
 import asyncio
@@ -22,6 +35,17 @@ logger = logging.getLogger(__name__)
 class StockPrice:
     """
     A dataclass to represent stock price data.
+
+    Attributes
+    ----------
+    code : str
+        The stock ticker symbol (e.g., 'AAPL', 'GOOGL', etc.).
+    price : float
+        The current price of the stock.
+    change : float
+        The percentage change compared to the previous price (in %).
+    timestamp : float
+        A UNIX timestamp representing the moment of this price capture.
     """
 
     code: str
@@ -33,7 +57,32 @@ class StockPrice:
 @t_with_worker
 class StockService:
     """
-    Virtual stock price data generator and distributor
+    Virtual stock price data generator and distributor.
+
+    This class simulates real-time stock price updates by randomly fluctuating
+    the prices of a predefined list of stock symbols. It runs in its own worker
+    thread, driven by an asyncio event loop.
+
+    Attributes
+    ----------
+    prices : Dict[str, float]
+        A mapping of stock code to current price.
+    last_prices : Dict[str, float]
+        A mapping of stock code to the previous price (for calculating percentage change).
+    _running : bool
+        Indicates whether the price generation loop is active.
+    _update_task : asyncio.Task, optional
+        The asyncio task that periodically updates prices.
+
+    Signals
+    -------
+    price_updated
+        Emitted every time a single stock price is updated. Receives a `StockPrice` object.
+
+    Lifecycle
+    ---------
+    - `on_started()` is called after the worker thread starts and before `update_prices()`.
+    - `on_stopped()` is called when the worker thread is shutting down.
     """
 
     def __init__(self):
@@ -63,7 +112,15 @@ class StockService:
 
     @property
     def descriptions(self) -> Dict[str, str]:
-        """Get the stock descriptions."""
+        """
+        Get the stock descriptions.
+
+        Returns
+        -------
+        Dict[str, str]
+            A dictionary mapping stock codes to their descriptive names (e.g. "AAPL": "Apple Inc.").
+        """
+
         with self._desc_lock:
             return dict(self._descriptions)
 
@@ -72,14 +129,22 @@ class StockService:
         """Signal emitted when stock price is updated"""
 
     async def on_started(self):
-        """Worker initialization"""
+        """
+        Called automatically when the worker thread is started.
+
+        Prepares and launches the asynchronous price update loop.
+        """
 
         logger.info("[StockService][on_started] started")
         self._running = True
         self._update_task = asyncio.create_task(self.update_prices())
 
     async def on_stopped(self):
-        """Worker shutdown"""
+        """
+        Called automatically when the worker thread is stopped.
+
+        Performs cleanup and cancellation of any active update tasks.
+        """
 
         logger.info("[StockService][on_stopped] stopped")
         self._running = False
@@ -93,7 +158,13 @@ class StockService:
                 pass
 
     async def update_prices(self):
-        """Periodically update stock prices"""
+        """
+        Periodically update stock prices in a loop.
+
+        Randomly perturbs the prices within a small percentage range, then
+        emits `price_updated` with a new `StockPrice` object for each stock.
+        """
+
         while self._running:
             for code, price in self.prices.items():
                 self.last_prices[code] = price
@@ -124,7 +195,20 @@ class StockService:
 @t_with_signals
 class StockViewModel:
     """
-    UI state manager
+    UI state manager for stock prices and alerts.
+
+    This class holds the current stock prices and user-defined alert settings,
+    and provides signals/slots for updating UI layers or notifying other components
+    about price changes and alerts.
+
+    Attributes
+    ----------
+    current_prices : Dict[str, StockPrice]
+        The latest known stock prices.
+    alerts : list[tuple[str, str, float]]
+        A list of triggered alerts in the form (stock_code, alert_type, current_price).
+    alert_settings : Dict[str, tuple[Optional[float], Optional[float]]]
+        A mapping of stock_code to (lower_alert_threshold, upper_alert_threshold).
     """
 
     def __init__(self):
@@ -134,23 +218,44 @@ class StockViewModel:
 
     @t_signal
     def prices_updated(self):
-        """Signal emitted when stock prices are updated"""
+        """
+        Signal emitted when stock prices are updated.
+
+        Receives a dictionary of the form {stock_code: StockPrice}.
+        """
 
     @t_signal
     def alert_added(self):
-        """Signal emitted when a new alert is added"""
+        """
+        Signal emitted when a new alert is added.
+
+        Receives (code, alert_type, current_price).
+        """
 
     @t_signal
     def set_alert(self):
-        """Signal emitted when user requests to set an alert"""
+        """
+        Signal emitted when user requests to set an alert.
+
+        Receives (code, lower, upper).
+        """
 
     @t_signal
     def remove_alert(self):
-        """Signal emitted when user requests to remove an alert"""
+        """
+        Signal emitted when user requests to remove an alert.
+
+        Receives (code).
+        """
 
     @t_slot
     def on_price_processed(self, price_data: StockPrice):
-        """Receive processed stock price data from StockProcessor"""
+        """
+        Receive processed stock price data from StockProcessor.
+
+        Updates the local `current_prices` and notifies listeners that prices
+        have changed.
+        """
 
         logger.debug("[StockViewModel][on_price_processed] price_data: %s", price_data)
         self.current_prices[price_data.code] = price_data
@@ -158,7 +263,11 @@ class StockViewModel:
 
     @t_slot
     def on_alert_triggered(self, code: str, alert_type: str, price: float):
-        """Receive alert trigger from StockProcessor"""
+        """
+        Receive an alert trigger from StockProcessor.
+
+        Appends the alert to `alerts` and emits `alert_added`.
+        """
 
         self.alerts.append((code, alert_type, price))
         self.alert_added.emit(code, alert_type, price)
@@ -167,7 +276,12 @@ class StockViewModel:
     def on_alert_settings_changed(
         self, code: str, lower: Optional[float], upper: Optional[float]
     ):
-        """Receive alert settings change notification from StockProcessor"""
+        """
+        Receive alert settings change notification from StockProcessor.
+
+        If both lower and upper are None, remove any alert setting for that code.
+        Otherwise, update or create a new alert setting for that code.
+        """
 
         if lower is None and upper is None:
             self.alert_settings.pop(code, None)
@@ -178,7 +292,31 @@ class StockViewModel:
 @t_with_worker
 class StockProcessor:
     """
-    Stock price data processor and alert condition checker
+    Stock price data processor and alert condition checker.
+
+    This class runs in a separate worker thread, receiving price updates from
+    `StockService` and determining whether alerts should be triggered based on
+    user-defined thresholds. If an alert condition is met, an `alert_triggered`
+    signal is emitted.
+
+    Attributes
+    ----------
+    price_alerts : Dict[str, tuple[Optional[float], Optional[float]]]
+        A mapping of stock_code to (lower_alert_threshold, upper_alert_threshold).
+
+    Signals
+    -------
+    price_processed
+        Emitted after processing a new price data and optionally triggering alerts.
+    alert_triggered
+        Emitted if a stock price crosses its set threshold.
+    alert_settings_changed
+        Emitted whenever a stock's alert thresholds are changed.
+
+    Lifecycle
+    ---------
+    - `on_started()` is invoked when the worker is fully initialized.
+    - `on_stopped()` is called upon shutdown/cleanup.
     """
 
     def __init__(self):
@@ -214,14 +352,22 @@ class StockProcessor:
     async def on_set_price_alert(
         self, code: str, lower: Optional[float], upper: Optional[float]
     ):
-        """Receive price alert setting request from main thread"""
+        """
+        Receive a price alert setting request from the main thread or UI.
+
+        Updates (or creates) a new alert threshold entry, then emits `alert_settings_changed`.
+        """
 
         self.price_alerts[code] = (lower, upper)
         self.alert_settings_changed.emit(code, lower, upper)
 
     @t_slot
     async def on_remove_price_alert(self, code: str):
-        """Receive price alert removal request from main thread"""
+        """
+        Receive a price alert removal request from the main thread or UI.
+
+        Deletes the alert thresholds for a given code, then emits `alert_settings_changed`.
+        """
 
         if code in self.price_alerts:
             del self.price_alerts[code]
@@ -229,7 +375,12 @@ class StockProcessor:
 
     @t_slot
     async def on_price_updated(self, price_data: StockPrice):
-        """Receive stock price update from StockService"""
+        """
+        Receive stock price updates from the `StockService`.
+
+        Delegates the actual processing to `process_price` via the task queue to
+        avoid blocking other operations.
+        """
 
         logger.debug("[StockProcessor][on_price_updated] price_data: %s", price_data)
 
@@ -240,7 +391,12 @@ class StockProcessor:
             logger.error("[SLOT] Error in on_price_updated: %s", e, exc_info=True)
 
     async def process_price(self, price_data: StockPrice):
-        """Process stock price data"""
+        """
+        Process the updated price data.
+
+        Checks if the stock meets the alert conditions (e.g., crossing upper/lower limits),
+        emits `alert_triggered` as needed, then emits `price_processed`.
+        """
 
         logger.debug("[StockProcessor][process_price] price_data: %s", price_data)
 

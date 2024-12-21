@@ -1,11 +1,11 @@
 # tests/integration/test_worker_queue.py
 
+# pylint: disable=no-member
+# pylint: disable=redefined-outer-name
+
 """
 Test cases for the worker-queue pattern.
 """
-
-# pylint: disable=no-member
-# pylint: disable=redefined-outer-name
 
 import asyncio
 import logging

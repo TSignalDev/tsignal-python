@@ -1,12 +1,17 @@
 # examples/stock_monitor_ui.py
 
-"""
-Stock monitor UI example.
-"""
-
 # pylint: disable=too-many-instance-attributes
 # pylint: disable=no-member
 # pylint: disable=unused-argument
+
+"""
+Stock monitor UI example.
+
+Demonstrates integrating TSignal-based signals/slots into a Kivy GUI application.
+It showcases a real-time price update loop (`StockService`), an alert/processing
+component (`StockProcessor`), and a Kivy-based front-end (`StockView`) for
+visualizing and setting stock alerts, all running asynchronously.
+"""
 
 import asyncio
 from typing import Dict
@@ -30,7 +35,17 @@ logger = logger_setup(__name__)
 
 @t_with_signals
 class StockView(BoxLayout):
-    """Stock monitor UI view"""
+    """
+    Stock monitor UI view (Kivy layout).
+
+    Displays:
+      - A status label
+      - A Start/Stop button
+      - A dropdown to select stock codes
+      - Current price and change
+      - Alert setting/removal inputs
+      - A display label for triggered alerts
+    """
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -95,7 +110,12 @@ class StockView(BoxLayout):
         self.add_widget(Widget(size_hint_y=1))
 
     def update_prices(self, prices: Dict[str, StockPrice]):
-        """Update price information"""
+        """
+        Update the displayed price information based on the currently selected stock.
+
+        If the spinner's text matches a code in `prices`, update the price label
+        and change label. Also shows a status message indicating successful update.
+        """
 
         if self.stock_spinner.text in prices:
             price_data = prices[self.stock_spinner.text]
@@ -105,13 +125,23 @@ class StockView(BoxLayout):
 
     @t_slot
     def on_alert_added(self, code: str, alert_type: str, price: float):
-        """Update UI when alert is triggered"""
+        """
+        Slot for handling newly triggered alerts.
+
+        Updates the `alert_label` in the UI to inform the user about the alert.
+        """
 
         self.alert_label.text = f"ALERT: {code} {alert_type} {price:.2f}"
 
 
 class AsyncKivyApp(App):
-    """Async Kivy app"""
+    """
+    A Kivy application that integrates with asyncio for background tasks.
+
+    This class sets up the UI (`StockView`), the stock service, processor,
+    and view model, and wires them together with signals/slots. It also provides
+    a background task that keeps the UI responsive and handles graceful shutdown.
+    """
 
     def __init__(self):
         super().__init__()
@@ -124,7 +154,9 @@ class AsyncKivyApp(App):
         self.async_lib = None
 
     def build(self):
-        """Build the UI"""
+        """
+        Build the UI layout, connect signals, and initialize the main components.
+        """
 
         self.view = StockView()
 
@@ -168,7 +200,9 @@ class AsyncKivyApp(App):
         return self.view
 
     def _toggle_service(self, instance):
-        """Toggle service start/stop"""
+        """
+        Start or stop the StockService and StockProcessor based on the current button state.
+        """
 
         if instance.text == "Start":
             self.service.start()
@@ -182,7 +216,11 @@ class AsyncKivyApp(App):
             self.view.status_label.text = "Service stopped"
 
     def _set_alert(self, instance):
-        """Alert setting button handler"""
+        """
+        Handle the "Set Alert" button press.
+
+        Reads the lower/upper thresholds from the text fields and emits `set_alert`.
+        """
 
         code = self.view.stock_spinner.text
         lower_str = self.view.lower_input.text.strip()
@@ -199,7 +237,11 @@ class AsyncKivyApp(App):
         self.view.alert_label.text = f"Alert set for {code}: lower={lower if lower else 'None'} upper={upper if upper else 'None'}"
 
     def _remove_alert(self, instance):
-        """Alert removal button handler"""
+        """
+        Handle the "Remove Alert" button press.
+
+        Emits `remove_alert` for the currently selected stock code.
+        """
 
         code = self.view.stock_spinner.text
 
@@ -211,7 +253,11 @@ class AsyncKivyApp(App):
         self.view.alert_label.text = f"Alert removed for {code}"
 
     async def background_task(self):
-        """Background task"""
+        """
+        Background task that can be used for periodic checks or housekeeping.
+
+        Runs concurrently with the Kivy event loop in async mode.
+        """
 
         try:
             while self.background_task_running:
@@ -220,15 +266,22 @@ class AsyncKivyApp(App):
             pass
 
     def on_request_close(self, *args):
-        """Request close handler"""
+        """
+        Intercept the Kivy window close event to properly shut down.
+
+        Returns True to indicate we handle the closing ourselves.
+        """
 
         asyncio.create_task(self.cleanup())
         return True
 
     async def cleanup(self):
-        """Cleanup"""
+        """
+        Perform a graceful shutdown by stopping background tasks and stopping the app.
+        """
 
         self.background_task_running = False
+
         for task in self.tasks:
             if not task.done():
                 task.cancel()
@@ -240,7 +293,14 @@ class AsyncKivyApp(App):
         self.stop()
 
     async def async_run(self, async_lib=None):
-        """Async run"""
+        """
+        Launch the Kivy app in an async context.
+
+        Parameters
+        ----------
+        async_lib : module or None
+            The async library to use (defaults to `asyncio`).
+        """
 
         self._async_lib = async_lib or asyncio
 
@@ -250,7 +310,9 @@ class AsyncKivyApp(App):
 
 
 async def main():
-    """Main function"""
+    """
+    Main entry point for running the Kivy app in an async-friendly manner.
+    """
 
     Clock.init_async_lib("asyncio")
 

@@ -1,5 +1,7 @@
 # tests/integration/test_with_signal.py
 
+# pylint: disable=duplicate-code
+
 """
 Test cases for the with-signal pattern.
 """

@@ -2,6 +2,18 @@
 
 """
 Stock monitor console example.
+
+This module demonstrates a command-line interface (CLI) for interacting
+with the stock monitoring system. It ties together `StockService`,
+`StockProcessor`, and `StockViewModel`, showing how signals/slots
+flow between them to provide user commands and real-time price updates.
+
+Usage:
+  1. Instantiate the main `StockMonitorCLI` class with references
+     to the service, processor, and view model.
+  2. Run `cli.run()` in an async context to start the CLI loop.
+  3. The user can type commands like "stocks", "alert", or "remove"
+     to manage alerts and display prices.
 """
 
 import asyncio
@@ -18,7 +30,28 @@ logger = logger_setup(__name__, level=logging.NOTSET)
 
 @t_with_signals
 class StockMonitorCLI:
-    """Stock monitoring CLI interface"""
+    """
+    Stock monitoring CLI interface.
+
+    This class provides a text-based interactive prompt where users can:
+      - View stock prices
+      - Set or remove price alerts
+      - Start/stop showing price updates
+      - Quit the application
+
+    Attributes
+    ----------
+    service : StockService
+        The worker responsible for generating stock prices.
+    processor : StockProcessor
+        The worker responsible for processing prices and handling alerts.
+    view_model : StockViewModel
+        A view-model that stores the latest prices and user alert settings.
+    showing_prices : bool
+        Whether the CLI is currently in "showprices" mode, continuously updating prices.
+    running : bool
+        Whether the CLI loop is active.
+    """
 
     def __init__(
         self,
@@ -47,7 +80,19 @@ class StockMonitorCLI:
         print("================\n")
 
     async def get_line_input(self, prompt="Command> "):
-        """Get line input"""
+        """
+        Get a line of user input asynchronously.
+
+        Parameters
+        ----------
+        prompt : str
+            The prompt to display before reading user input.
+
+        Returns
+        -------
+        str
+            The user-inputted line.
+        """
 
         return await asyncio.get_event_loop().run_in_executor(
             None, lambda: input(prompt)
@@ -55,7 +100,12 @@ class StockMonitorCLI:
 
     @t_slot
     def on_prices_updated(self, prices: Dict[str, StockPrice]):
-        """Process price updates"""
+        """
+        Respond to updated prices in the view model.
+
+        If `showing_prices` is True, prints the current prices and any triggered alerts
+        to the console without re-displaying the main menu.
+        """
 
         # If we are in showprices mode, display current prices:
         if self.showing_prices:
@@ -90,7 +140,17 @@ class StockMonitorCLI:
                     print(alert)
 
     async def process_command(self, command: str):
-        """Process command"""
+        """
+        Process a single user command from the CLI.
+
+        Supported commands:
+          - stocks
+          - alert <code> <lower> <upper>
+          - remove <code>
+          - list
+          - showprices
+          - quit
+        """
 
         parts = command.strip().split()
 
@@ -133,6 +193,18 @@ class StockMonitorCLI:
                 self.view_model.remove_alert.emit(code)
                 print(f"Alert removed for {code}")
 
+        elif parts[0] == "list":
+            if not self.view_model.alert_settings:
+                print("\nNo alerts currently set.")
+            else:
+                print("\nCurrent alerts:")
+                print(f"{'Code':^6} {'Lower':>10} {'Upper':>10}")
+                print("-" * 30)
+                for code, (lower, upper) in sorted(
+                    self.view_model.alert_settings.items()
+                ):
+                    print(f"{code:<6} ${lower:>9.2f} ${upper:>9.2f}")
+
         elif parts[0] == "showprices":
             self.showing_prices = True
             print("Now showing price updates. Press Enter to return to menu.")
@@ -145,7 +217,12 @@ class StockMonitorCLI:
             print(f"Unknown command: {command}")
 
     async def run(self):
-        """CLI execution"""
+        """
+        Main execution loop for the CLI.
+
+        Connects signals between `service`, `processor`, and `view_model`,
+        then continuously reads user input until the user exits.
+        """
 
         logger.debug(
             "[StockMonitorCLI][run] started current loop: %s %s",
@@ -184,7 +261,12 @@ class StockMonitorCLI:
             self.view_model, self.view_model.on_price_processed
         )
         self.view_model.prices_updated.connect(self, self.on_prices_updated)
-
+        self.view_model.set_alert.connect(
+            self.processor, self.processor.on_set_price_alert
+        )
+        self.view_model.remove_alert.connect(
+            self.processor, self.processor.on_remove_price_alert
+        )
         self.processor.alert_triggered.connect(
             self.view_model, self.view_model.on_alert_triggered
         )
