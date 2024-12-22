@@ -801,8 +801,11 @@ def t_slot(func):
                 try:
                     self._tsignal_loop = asyncio.get_running_loop()
                 except RuntimeError:
-                    self._tsignal_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(self._tsignal_loop)
+                    t_signal_log_and_raise_error(
+                        logger,
+                        RuntimeError,
+                        "[TSignal][t_slot][wrap] No running event loop found.",
+                    )
 
             if not _tsignal_from_emit.get():
                 current_thread = threading.current_thread()
