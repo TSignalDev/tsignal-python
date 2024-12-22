@@ -13,6 +13,24 @@ TSignal is a lightweight, pure-Python signal/slot library that provides thread-s
 - **Weak Reference**: 
   - By setting `weak=True` when connecting a slot, the library holds a weak reference to the receiver object. This allows the receiver to be garbage-collected if there are no other strong references to it. Once garbage-collected, the connection is automatically removed, preventing stale references.
 
+### **Requires an Existing Event Loop**
+
+Since TSignal relies on Python’s `asyncio` infrastructure for scheduling async slots and cross-thread calls, you **must** have a running event loop before using TSignal’s decorators like `@t_with_signals` or `@t_slot`. Typically, this means:
+
+1. **Inside `asyncio.run(...)`:**  
+   For example:
+   ```python
+   async def main():
+       # create objects, do your logic
+       ...
+   asyncio.run(main())
+   ```
+
+2. **@t_with_worker Decorator:**
+   If you decorate a class with `@t_with_worker`, it automatically creates a worker thread with its own event loop. That pattern is isolated to the worker context, so any other async usage in the main thread also needs its own loop.
+
+If no event loop is running when a slot is called, TSignal will raise a RuntimeError instead of creating a new loop behind the scenes. This ensures consistent concurrency behavior and avoids hidden loops that might never process tasks.
+
 ## Why TSignal?
 
 Modern Python applications often rely on asynchronous operations and multi-threading. Traditional event frameworks either require large external dependencies or lack seamless async/thread support. TSignal provides:

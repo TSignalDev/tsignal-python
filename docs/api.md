@@ -1,11 +1,13 @@
 # API Reference
 
 ## Requirements
-TSignal requires Python 3.10 or higher.
+TSignal requires Python 3.10 or higher, and a running `asyncio` event loop for any async usage.
 
 ## Decorators
 ### `@t_with_signals`
 Enables signal-slot functionality on a class. Classes decorated with `@t_with_signals` can define signals and have their slots automatically assigned event loops and thread affinity.
+
+**Important**: `@t_with_signals` expects that you already have an `asyncio` event loop running (e.g., via `asyncio.run(...)`) unless you only rely on synchronous slots in a single-thread scenario. When in doubt, wrap your main logic in an async function and call `asyncio.run(main())`.
 
 **Usage:**
 ```python
@@ -31,7 +33,7 @@ self.my_signal.emit(value)
 ```
 
 ### `@t_slot`
-Marks a method as a slot. Slots can be synchronous or asynchronous methods. Slots automatically handle thread affinity and can be connected to signals.
+Marks a method as a slot. Slots can be synchronous or asynchronous methods. TSignal automatically handles cross-thread invocation—**but only if there is a running event loop**.  
 
 **Usage:**
 
@@ -46,8 +48,11 @@ async def on_async_signal(self, value):
     print("Async Received:", value)
 ```
 
+**Event Loop Requirement**:
+If the decorated slot is async, or if the slot might be called from another thread, TSignal uses asyncio scheduling. That means a running event loop is mandatory. If no loop is found, a RuntimeError is raised.
+
 ### `@t_with_worker`
-Decorates a class to run inside a dedicated worker thread with its own event loop. Ideal for offloading tasks without blocking the main thread. The worker provides:
+Decorates a class to run inside a dedicated worker thread with its own event loop. Ideal for offloading tasks without blocking the main thread. When using @t_with_worker, the worker thread automatically sets up its own event loop, so calls within that worker are safe. For the main thread, you still need an existing loop if you plan on using async slots or cross-thread signals. The worker provides:
 
 A dedicated event loop in another thread.
 The `run(*args, **kwargs)` coroutine as the main entry point.
