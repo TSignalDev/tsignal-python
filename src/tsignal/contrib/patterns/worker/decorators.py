@@ -75,7 +75,7 @@ def t_with_worker(cls):
         async def run(self, config=None):
             print("Worker started with config:", config)
             # Wait until stop is requested
-            await self._tsignal_stopping.wait()
+            await self.wait_for_stop()
             print("Worker finishing...")
 
         async def do_work(self, data):
@@ -108,9 +108,7 @@ def t_with_worker(cls):
                 All operations that access or modify worker's lifecycle state must be
                 performed while holding this lock.
             """
-            self._tsignal_lifecycle_lock = (
-                threading.RLock()
-            )  # Renamed lock for loop and thread
+            self._tsignal_lifecycle_lock = threading.RLock()
             self._tsignal_stopping = asyncio.Event()
             self._tsignal_affinity = object()
             self._tsignal_process_queue_task = None
@@ -120,8 +118,10 @@ def t_with_worker(cls):
         @property
         def event_loop(self) -> asyncio.AbstractEventLoop:
             """Returns the worker's event loop"""
+
             if not self._tsignal_loop:
                 raise RuntimeError("Worker not started")
+
             return self._tsignal_loop
 
         @t_signal
@@ -134,6 +134,7 @@ def t_with_worker(cls):
 
         async def run(self, *args, **kwargs):
             """Run the worker."""
+
             logger.debug("[WorkerClass][run] calling super")
 
             super_run = getattr(super(), _WorkerConstants.RUN, None)
@@ -161,8 +162,10 @@ def t_with_worker(cls):
 
         async def _process_queue(self):
             """Process the task queue."""
+
             while not self._tsignal_stopping.is_set():
                 coro = await self._tsignal_task_queue.get()
+
                 try:
                     await coro
                 except Exception as e:
@@ -176,12 +179,14 @@ def t_with_worker(cls):
 
         async def start_queue(self):
             """Start the task queue processing. Returns the queue task."""
+
             self._tsignal_process_queue_task = asyncio.create_task(
                 self._process_queue()
             )
 
         def queue_task(self, coro):
             """Method to add a task to the queue"""
+
             if not asyncio.iscoroutine(coro):
                 logger.error(
                     "[WorkerClass][queue_task] Task must be a coroutine object: %s",
@@ -196,6 +201,7 @@ def t_with_worker(cls):
 
         def start(self, *args, **kwargs):
             """Start the worker thread."""
+
             run_coro = kwargs.pop(_WorkerConstants.RUN_CORO, None)
 
             if run_coro is not None and not asyncio.iscoroutine(run_coro):
@@ -207,6 +213,7 @@ def t_with_worker(cls):
 
             def thread_main():
                 """Thread main function."""
+
                 self._tsignal_task_queue = asyncio.Queue()
 
                 with self._tsignal_lifecycle_lock:
@@ -215,6 +222,7 @@ def t_with_worker(cls):
 
                 async def runner():
                     """Runner function."""
+
                     self.started.emit()
 
                     if run_coro is not None:
@@ -323,5 +331,10 @@ def t_with_worker(cls):
                 self._tsignal_thread,
                 self._tsignal_affinity,
             )
+
+        async def wait_for_stop(self):
+            """Wait for the worker to stop."""
+
+            await self._tsignal_stopping.wait()
 
     return WorkerClass

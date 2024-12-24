@@ -147,7 +147,7 @@ class DataProcessor:
     async def run(self, *args, **kwargs):
         # The main entry point for the worker thread’s event loop
         # Wait for tasks or stopping signal
-        await self._tsignal_stopping.wait()
+        await self.wait_for_stop()
 
     async def process_data(self, data):
         # Perform heavy computation in the worker thread
