@@ -75,7 +75,7 @@ class Worker:
         # run is the main entry point in the worker thread
         print("Worker started with config:", config)
         # Wait until stop is requested
-        await self._tsignal_stopping.wait()
+        await self.wait_for_stop()
         self.finished.emit()
 
     async def do_work(self, data):
@@ -201,6 +201,7 @@ Slots can be async. When a signal with an async slot is emitted:
 - `run(*args, **kwargs)` defines the worker’s main logic.
 - `queue_task(coro)` schedules coroutines on the worker's event loop.
 - `stop()` requests a graceful shutdown, causing `run()` to end after `_tsignal_stopping` is triggered.
+- `wait_for_stop()` is a coroutine that waits for the worker to stop.
 
 **Signature Match for** ``run()``:
 
@@ -262,7 +263,7 @@ class BackgroundWorker:
 
     async def run(self):
         # Just wait until stopped
-        await self._tsignal_stopping.wait()
+        await self.wait_for_stop()
 
     async def heavy_task(self, data):
         await asyncio.sleep(2)  # Simulate heavy computation

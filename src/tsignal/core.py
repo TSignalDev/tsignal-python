@@ -73,6 +73,7 @@ class TConnection:
 
         if self.is_weak and isinstance(self.receiver_ref, weakref.ref):
             return self.receiver_ref() is not None
+
         return True
 
     def get_slot_to_call(self):
@@ -126,10 +127,7 @@ def _wrap_standalone_function(func, is_coroutine):
                     ),
                 )
 
-            return func(*args, **kwargs)
-        else:
-            # Call sync function -> return result
-            return func(*args, **kwargs)
+        return func(*args, **kwargs)
 
     return wrap
 
@@ -303,12 +301,6 @@ class TSignal:
             )
             is_coro_slot = asyncio.iscoroutinefunction(maybe_slot)
 
-            is_coro_slot = asyncio.iscoroutinefunction(
-                receiver_or_slot.__func__
-                if hasattr(receiver_or_slot, "__self__")
-                else receiver_or_slot
-            )
-
             if is_bound_method:
                 obj = receiver_or_slot.__self__
 
@@ -394,6 +386,7 @@ class TSignal:
 
     def _cleanup_on_ref_dead(self, ref):
         """Cleanup connections on weak reference death."""
+
         # ref is a weak reference to the receiver
         # Remove connections associated with the dead receiver
         with self.connections_lock:
@@ -448,6 +441,7 @@ class TSignal:
                 # No receiver or slot specified, remove all connections.
                 count = len(self.connections)
                 self.connections.clear()
+
                 return count
 
             original_count = len(self.connections)
@@ -496,6 +490,7 @@ class TSignal:
                 "[TSignal][disconnect][END] disconnected: %s",
                 disconnected,
             )
+
             return disconnected
 
     def emit(self, *args, **kwargs):
@@ -726,6 +721,7 @@ def t_signal(func):
 
         if not hasattr(self, f"_{sig_name}"):
             setattr(self, f"_{sig_name}", TSignal())
+
         return getattr(self, f"_{sig_name}")
 
     return TSignalProperty(wrap, sig_name)
@@ -814,6 +810,7 @@ def t_slot(func):
                     future = asyncio.run_coroutine_threadsafe(
                         func(self, *args, **kwargs), self._tsignal_loop
                     )
+
                     return await asyncio.wrap_future(future)
 
             return await func(self, *args, **kwargs)
@@ -853,6 +850,7 @@ def t_slot(func):
                             future.set_exception(e)
 
                     self._tsignal_loop.call_soon_threadsafe(callback)
+
                     return future.result()
 
             return func(self, *args, **kwargs)
@@ -938,6 +936,7 @@ def t_with_signals(cls=None, *, loop=None, weak_default=True):
             original_init(self, *args, **kwargs)
 
         cls.__init__ = __init__
+
         return cls
 
     if cls is None:

@@ -93,6 +93,7 @@ class TProperty(property):
     def __get__(self, obj, objtype=None):
         if obj is None:
             return self
+
         if self.fget is None:
             raise AttributeError("unreadable attribute")
 
@@ -104,6 +105,7 @@ class TProperty(property):
             future = asyncio.run_coroutine_threadsafe(
                 self._get_value(obj), obj._tsignal_loop
             )
+
             return future.result()
         else:
             return self._get_value_sync(obj)
@@ -123,6 +125,7 @@ class TProperty(property):
             future = asyncio.run_coroutine_threadsafe(
                 self._set_value(obj, value), obj._tsignal_loop
             )
+
             # Wait for completion like slot direct calls
             return future.result()
         else:

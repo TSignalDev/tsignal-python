@@ -269,7 +269,7 @@ class BackgroundWorker:
     async def run(self, *args, **kwargs):
         # The main entry point in the worker thread.
         # Wait until stopped
-        await self._tsignal_stopping.wait()
+        await self.wait_for_stop()
 
     async def heavy_task(self, data):
         await asyncio.sleep(2)  # Simulate heavy computation
@@ -292,7 +292,7 @@ If `run()` accepts additional parameters, simply provide them to `start()`:
 ```python
 async def run(self, config=None):
     # Use config here
-    await self._tsignal_stopping.wait()
+    await self.wait_for_stop()
 ```
 
 ```python

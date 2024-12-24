@@ -70,7 +70,7 @@ class DataWorker:
         self._running = True
         self._update_task = asyncio.create_task(self.update_loop())
         # Wait until run() is finished
-        await self._tsignal_stopping.wait()
+        await self.wait_for_stop()
         # Clean up
         self._running = False
 
