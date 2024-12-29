@@ -1,4 +1,11 @@
-# TSignal
+# TSignal (Deprecated - Moving to Pynnex)
+
+> ⚠️ **Important Notice**: TSignal has been rebranded to Pynnex. This package is deprecated as of version 0.5.x, and all future development will take place at [Pynnex](https://github.com/nexconnectio/pynnex). Please use Pynnex for new projects.
+
+```bash
+# New package installation:
+pip install pynnex
+```
 
 TSignal is a lightweight, pure-Python signal/slot library that provides thread-safe, asyncio-compatible event handling inspired by the Qt signal/slot pattern—but without the heavyweight Qt dependencies. It enables clean decoupling of components, seamless thread-to-thread communication, and flexible asynchronous/synchronous slot handling.
 
@@ -44,9 +51,11 @@ Modern Python applications often rely on asynchronous operations and multi-threa
 
 TSignal requires Python 3.10 or higher.
 
+> ⚠️ **Note**: For new installations, please use `pip install pynnex` instead.
+
 ```bash
-git clone https://github.com/TSignalDev/tsignal-python.git
-cd tsignal-python
+git clone https://github.com/nexconnectio/pynnex.git
+cd pynnex
 pip install -e .
 ```
 

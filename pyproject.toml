@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tsignal"
-version = "0.4.4"
-description = "A Python Signal-Slot library inspired by Qt"
+version = "0.5.0"
+description = "A Python Signal-Slot library inspired by Qt (Deprecated - Use pynnex instead)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -25,10 +25,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/TSignalDev/tsignal-python"
-Repository = "https://github.com/TSignalDev/tsignal-python"
-Documentation = "https://github.com/TSignalDev/tsignal-python#readme"
-Issues = "https://github.com/TSignalDev/tsignal-python/issues"
+Homepage = "https://github.com/nexconnectio/pynnex"
+Repository = "https://github.com/nexconnectio/pynnex"
+Documentation = "https://github.com/nexconnectio/pynnex#readme"
+Issues = "https://github.com/nexconnectio/pynnex/issues"
 
 [project.optional-dependencies]
 dev = [

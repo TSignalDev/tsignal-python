@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2024-12-28
+
+### Important Notice
+- **Package Deprecation**: TSignal is being rebranded to Pynnex. This version marks the beginning of the deprecation period.
+- All future development will continue at [github.com/nexconnectio/pynnex](https://github.com/nexconnectio/pynnex)
+- Users are encouraged to migrate to the new package: `pip install pynnex`
+
+### Changed
+- Updated all repository URLs to point to the new Pynnex repository
+- Added deprecation warnings when importing the package
+- Updated package metadata to reflect deprecated status
+
 ## [0.4.0] - 2024-12-21
 
 ### Added

@@ -1,8 +1,15 @@
-# pylint: disable=missing-module-docstring
+import warnings
 
 """
-TSignal - Python Signal/Slot Implementation
+TSignal - Python Signal/Slot Implementation (Deprecated - Use pynnex instead)
 """
+
+warnings.warn(
+    "The tsignal package is deprecated as of version 0.5.x. "
+    "Please use the pynnex package instead. "
+    "For more information, visit https://github.com/nexconnectio/pynnex",
+    DeprecationWarning,
+)
 
 from .core import (
     t_with_signals,
@@ -15,7 +22,7 @@ from .core import (
 from .utils import t_signal_log_and_raise_error
 from .contrib.patterns.worker.decorators import t_with_worker
 
-__version__ = "0.1.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "t_with_signals",
